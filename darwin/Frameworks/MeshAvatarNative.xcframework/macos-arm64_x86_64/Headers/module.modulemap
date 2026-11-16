@@ -1,0 +1,4 @@
+module MeshAvatarNative {
+  header "mesh_avatar_render.h"
+  export *
+}

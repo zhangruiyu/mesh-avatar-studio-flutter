@@ -1,0 +1,23 @@
+PODS:
+  - FlutterMacOS (1.0.0)
+  - mesh_avatar_studio (0.1.0):
+    - Flutter
+    - FlutterMacOS
+
+DEPENDENCIES:
+  - FlutterMacOS (from `Flutter/ephemeral`)
+  - mesh_avatar_studio (from `Flutter/ephemeral/.symlinks/plugins/mesh_avatar_studio/darwin`)
+
+EXTERNAL SOURCES:
+  FlutterMacOS:
+    :path: Flutter/ephemeral
+  mesh_avatar_studio:
+    :path: Flutter/ephemeral/.symlinks/plugins/mesh_avatar_studio/darwin
+
+SPEC CHECKSUMS:
+  FlutterMacOS: c232990155153907050900a2e175c7773903ba4e
+  mesh_avatar_studio: 9cd70d28a354e362f2dc966c0a389d56603bbcf0
+
+PODFILE CHECKSUM: 1e95c36afbfd1cb6423ceca4de7a8e1b256fb6ac
+
+COCOAPODS: 1.16.2

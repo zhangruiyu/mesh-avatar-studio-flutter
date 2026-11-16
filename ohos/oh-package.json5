@@ -1,0 +1,5 @@
+{
+  "name": "mesh_avatar_studio", "version": "0.1.0", "description": "Mesh Avatar Studio 原生纹理播放器",
+  "main": "index.ets", "license": "MIT",
+  "dependencies": {"libavatar_bridge.so": "file:./src/main/cpp/types/libavatar_bridge"}
+}

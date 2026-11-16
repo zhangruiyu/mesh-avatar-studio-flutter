@@ -1,0 +1,36 @@
+{
+  "upstreamCommit": "6d2817aa0869365a0a5634241bf50af6bfd78a2a",
+  "rustVersion": "1.100.0",
+  "files": [
+    {
+      "path": "android/src/main/jniLibs/arm64-v8a/libmesh_avatar_ffi.so",
+      "bytes": 10253704,
+      "sha256": "4fa2b79af7df4a4179f0454ec12aa5fa8a89bc66f1f7401f9418d1b600607fc3"
+    },
+    {
+      "path": "android/src/main/jniLibs/x86_64/libmesh_avatar_ffi.so",
+      "bytes": 9981208,
+      "sha256": "da8b9a438a4273cc80373a18e21c343b7115716db75b45a0a97578721c4e9979"
+    },
+    {
+      "path": "darwin/Frameworks/MeshAvatarNative.xcframework/ios-arm64/libmesh_avatar_ffi.a",
+      "bytes": 39345864,
+      "sha256": "42f1345b39d32a0fbd0fa01a212b52305259886bfd7e0f2f98dd8823958ba01e"
+    },
+    {
+      "path": "darwin/Frameworks/MeshAvatarNative.xcframework/ios-arm64_x86_64-simulator/libmesh_avatar_ffi.a",
+      "bytes": 77621240,
+      "sha256": "a4a847adc7945c9126a65c071fc22ac5962598d4398e2016e650f9747a6c339e"
+    },
+    {
+      "path": "darwin/Frameworks/MeshAvatarNative.xcframework/macos-arm64_x86_64/libmesh_avatar_ffi.a",
+      "bytes": 78852712,
+      "sha256": "53b7ba4b1f23aba33158efd68be0218edc60a9e76a634f5987f4632bc4f8f104"
+    },
+    {
+      "path": "ohos/libs/arm64-v8a/libmesh_avatar_ffi.so",
+      "bytes": 2443416,
+      "sha256": "85de8e41030388781e4737ad3c573b6423b9d4305ccb185af5193d13c9d3c85a"
+    }
+  ]
+}

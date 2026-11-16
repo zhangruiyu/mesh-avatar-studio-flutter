@@ -1,0 +1,10 @@
+{
+  "module": {
+    "name": "mesh_avatar_studio",
+    "type": "har",
+    "deviceTypes": [
+      "default",
+      "tablet"
+    ]
+  }
+}

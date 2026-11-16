@@ -1,0 +1,11 @@
+cmake_minimum_required(VERSION 3.22.1)
+project(mesh_avatar_studio LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+get_filename_component(PLUGIN_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../.." ABSOLUTE)
+add_library(mesh_avatar_ffi SHARED IMPORTED)
+set_target_properties(mesh_avatar_ffi PROPERTIES IMPORTED_NO_SONAME TRUE
+  IMPORTED_LOCATION "${PLUGIN_ROOT}/android/src/main/jniLibs/${ANDROID_ABI}/libmesh_avatar_ffi.so")
+add_library(mesh_avatar_bridge SHARED avatar_jni.cpp)
+target_include_directories(mesh_avatar_bridge PRIVATE "${PLUGIN_ROOT}/native/include")
+target_link_libraries(mesh_avatar_bridge PRIVATE mesh_avatar_ffi android log)
+target_link_options(mesh_avatar_bridge PRIVATE "-Wl,-z,max-page-size=16384")

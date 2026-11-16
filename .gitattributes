@@ -1,0 +1,5 @@
+# 第三方文件保留上游文本，不对许可证做空白修整。
+third_party/** -whitespace
+native/upstream/** -whitespace
+*.a binary
+*.so binary
