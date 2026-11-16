@@ -2,7 +2,7 @@ import Foundation
 import MeshAvatarNative
 import CoreVideo
 import QuartzCore
-import Accelerate
+import Metal
 #if os(macOS)
 import FlutterMacOS
 #else
@@ -10,7 +10,7 @@ import Flutter
 #endif
 
 // Rust 负责动作和 Metal 绘制，Flutter 插件只接收原生纹理。
-// 上游目前提供同步像素回读，所以暂用后台队列回读；这不是零拷贝正式方案。
+// Metal 直接绘制到 IOSurface；只将已经完成的共享缓冲区交给 Flutter。
 public final class MeshAvatarStudioPlugin: NSObject, FlutterPlugin, FlutterTexture {
   private let registry: FlutterTextureRegistry
   private let channel: FlutterMethodChannel
@@ -18,6 +18,15 @@ public final class MeshAvatarStudioPlugin: NSObject, FlutterPlugin, FlutterTextu
   private let pixelLock = NSLock()
   private var pixelBuffer: CVPixelBuffer?
   private var pool: CVPixelBufferPool?
+  private var textureCache: CVMetalTextureCache?
+  // GPU 完成前保留两层引用，防止池提前复用仍在写入的 IOSurface。
+  private struct PendingFrame {
+    let serial: UInt64
+    let buffer: CVPixelBuffer
+    let texture: CVMetalTexture
+    let submitMs: Double
+  }
+  private var pendingFrames: [PendingFrame] = []
   private var timer: DispatchSourceTimer?
   private var avatar: UInt64 = 0
   private var renderer: UInt64 = 0
@@ -26,7 +35,6 @@ public final class MeshAvatarStudioPlugin: NSObject, FlutterPlugin, FlutterTextu
   private var detached = false
   private let width = 600
   private let height = 800
-  private var rgba = [UInt8](repeating: 0, count: 600 * 800 * 4)
   private var paused = false
   private var speaking = false
   private var mouthDemo = false
@@ -86,7 +94,14 @@ public final class MeshAvatarStudioPlugin: NSObject, FlutterPlugin, FlutterTextu
           }
           var options = MaRenderOptions(width: UInt32(self.width), height: UInt32(self.height), samples: 1, fit: UInt32(MA_FIT_COVER), pad_top: 0.06, pad_side: 0.02)
           do {
-            try self.check(mesh_avatar_renderer_create(self.avatar, &options, &self.renderer))
+            try self.check(mesh_avatar_gpu_create(self.avatar, &options, nil, &self.renderer))
+            var devicePointer: UnsafeMutableRawPointer?
+            try self.check(mesh_avatar_gpu_metal_device(self.renderer, &devicePointer))
+            guard let devicePointer = devicePointer,
+                  let device = Unmanaged<AnyObject>.fromOpaque(devicePointer).takeUnretainedValue() as? MTLDevice,
+                  CVMetalTextureCacheCreate(nil, nil, device, nil, &self.textureCache) == kCVReturnSuccess else {
+              throw NSError(domain: "MeshAvatar", code: 2, userInfo: [NSLocalizedDescriptionKey: "无法建立共享 Metal 纹理缓存"])
+            }
             let attributes: [String: Any] = [
               kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
               kCVPixelBufferWidthKey as String: self.width,
@@ -104,7 +119,7 @@ public final class MeshAvatarStudioPlugin: NSObject, FlutterPlugin, FlutterTextu
             self.speaking = false
             self.mouthDemo = false
             self.expression = "neutral"
-            try self.drawFrame(dt: 0)
+            _ = try self.drawFrame(dt: 0)
           } catch {
             self.releaseNative()
             throw error
@@ -188,9 +203,10 @@ public final class MeshAvatarStudioPlugin: NSObject, FlutterPlugin, FlutterTextu
           let now = CACurrentMediaTime()
           let dt = min(0.05, now - self.lastTick)
           self.lastTick = now
-          try self.drawFrame(dt: dt)
-          DispatchQueue.main.async {
-            if self.textureId >= 0 { self.registry.textureFrameAvailable(self.textureId) }
+          if try self.drawFrame(dt: dt) {
+            DispatchQueue.main.async {
+              if self.textureId >= 0 { self.registry.textureFrameAvailable(self.textureId) }
+            }
           }
         } catch {
           self.timer?.cancel()
@@ -204,38 +220,53 @@ public final class MeshAvatarStudioPlugin: NSObject, FlutterPlugin, FlutterTextu
     source.resume()
   }
 
-  private func drawFrame(dt: Double) throws {
+  private func drawFrame(dt: Double) throws -> Bool {
     let started = CACurrentMediaTime()
+    var completed: UInt64 = 0
+    try check(mesh_avatar_gpu_poll(renderer, &completed))
+    var published = false
+    while let frame = pendingFrames.first, frame.serial <= completed {
+      pixelLock.lock()
+      pixelBuffer = frame.buffer
+      pixelLock.unlock()
+      frames += 1
+      renderTotal += frame.submitMs
+      pendingFrames.removeFirst()
+      published = true
+    }
     elapsed += dt
-    // 本按钮只是无声口型演示；正式接语音时应传真实音量，不能把它当语音同步。
+    // 即使合成器暂时占用全部缓冲，动作时间仍继续推进；只跳过绘制。
     if mouthDemo {
       let level = max(0, sin(elapsed * 9)) * (0.35 + 0.45 * abs(sin(elapsed * 3.7)))
       try check(mesh_avatar_set_voice_level(avatar, level))
     }
     try check(mesh_avatar_tick(avatar, dt))
-    let status = rgba.withUnsafeMutableBufferPointer {
-      mesh_avatar_renderer_render(renderer, $0.baseAddress, $0.count, UInt32(MA_RGBA_PREMULTIPLIED))
-    }
-    try check(status)
-    guard let pool = pool else { return }
+    guard pendingFrames.count < 2, let pool = pool, let cache = textureCache else { return published }
+    // 三张全尺寸缓冲为上限。Flutter 仍持有的缓冲不会被池重用，也不无限扩容。
+    let limits = [kCVPixelBufferPoolAllocationThresholdKey as String: 3] as CFDictionary
     var next: CVPixelBuffer?
-    guard CVPixelBufferPoolCreatePixelBuffer(nil, pool, &next) == kCVReturnSuccess, let next = next else {
-      throw NSError(domain: "MeshAvatar", code: 4, userInfo: [NSLocalizedDescriptionKey: "无法分配角色纹理"])
+    var status = CVPixelBufferPoolCreatePixelBufferWithAuxAttributes(nil, pool, limits, &next)
+    if status == kCVReturnWouldExceedAllocationThreshold {
+      CVMetalTextureCacheFlush(cache, 0)
+      status = CVPixelBufferPoolCreatePixelBufferWithAuxAttributes(nil, pool, limits, &next)
     }
-    CVPixelBufferLockBaseAddress(next, [])
-    // 原生库输出 RGBA，而 Flutter Apple 纹理要求 BGRA；保留预乘透明度。
-    rgba.withUnsafeMutableBytes { raw in
-      var source = vImage_Buffer(data: raw.baseAddress!, height: UInt(height), width: UInt(width), rowBytes: width * 4)
-      var target = vImage_Buffer(data: CVPixelBufferGetBaseAddress(next)!, height: UInt(height), width: UInt(width), rowBytes: CVPixelBufferGetBytesPerRow(next))
-      let order: [UInt8] = [2, 1, 0, 3]
-      _ = vImagePermuteChannels_ARGB8888(&source, &target, order, vImage_Flags(kvImageNoFlags))
+    if status == kCVReturnWouldExceedAllocationThreshold { return published }
+    guard status == kCVReturnSuccess, let next = next else {
+      throw NSError(domain: "MeshAvatar", code: 4, userInfo: [NSLocalizedDescriptionKey: "无法分配共享角色纹理"])
     }
-    CVPixelBufferUnlockBaseAddress(next, [])
-    pixelLock.lock()
-    pixelBuffer = next
-    pixelLock.unlock()
-    frames += 1
-    renderTotal += (CACurrentMediaTime() - started) * 1000
+    var sharedTexture: CVMetalTexture?
+    // 明确 renderTarget 用途，映射同一张 IOSurface；没有像素格式转换或 CPU 拷贝。
+    let attributes = [kCVMetalTextureUsage as String: MTLTextureUsage.renderTarget.rawValue] as CFDictionary
+    guard CVMetalTextureCacheCreateTextureFromImage(nil, cache, next, attributes,
+            .bgra8Unorm, width, height, 0, &sharedTexture) == kCVReturnSuccess,
+          let sharedTexture = sharedTexture, let texture = CVMetalTextureGetTexture(sharedTexture) else {
+      throw NSError(domain: "MeshAvatar", code: 4, userInfo: [NSLocalizedDescriptionKey: "无法映射共享 Metal 纹理"])
+    }
+    var serial: UInt64 = 0
+    try check(mesh_avatar_gpu_draw_metal(renderer, Unmanaged.passUnretained(texture as AnyObject).toOpaque(), &serial))
+    pendingFrames.append(PendingFrame(serial: serial, buffer: next, texture: sharedTexture,
+                                     submitMs: (CACurrentMediaTime() - started) * 1000))
+    return published
   }
 
   public func detachFromEngine(for registrar: FlutterPluginRegistrar) {
@@ -253,11 +284,13 @@ public final class MeshAvatarStudioPlugin: NSObject, FlutterPlugin, FlutterTextu
 
   private func releaseNative() {
     // 渲染器引用角色，因此必须先释放渲染器，最后才释放角色句柄。
-    if renderer != 0 { _ = mesh_avatar_renderer_destroy(renderer); renderer = 0 }
+    if renderer != 0 { _ = mesh_avatar_gpu_destroy(renderer); renderer = 0 }
     if avatar != 0 { _ = mesh_avatar_destroy(avatar); avatar = 0 }
     pixelLock.lock()
     pixelBuffer = nil
     pixelLock.unlock()
+    pendingFrames.removeAll()
+    textureCache = nil
     pool = nil
   }
 }

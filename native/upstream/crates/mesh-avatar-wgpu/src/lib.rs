@@ -114,6 +114,9 @@ struct LayerBuffers {
     bind_group: wgpu::BindGroup,
     vertex_len: usize,
     index_len: u32,
+    // UV 和索引通常不变；按内容比较，兼容数量相同但数据变化的模型。
+    last_uvs: Vec<f32>,
+    last_indices: Vec<u32>,
 }
 struct Multisample {
     size: [u32; 2],
@@ -485,16 +488,24 @@ impl Renderer {
                         bind_group,
                         vertex_len: layer.positions.len(),
                         index_len: layer.indices.len() as u32,
+                        last_uvs: layer.uvs.clone(),
+                        last_indices: layer.indices.clone(),
                     },
                 );
             }
-            let gpu = &self.layers[&layer.name];
+            let gpu = self.layers.get_mut(&layer.name).unwrap();
             self.queue
                 .write_buffer(&gpu.positions, 0, bytemuck::cast_slice(&layer.positions));
-            self.queue
-                .write_buffer(&gpu.uvs, 0, bytemuck::cast_slice(&layer.uvs));
-            self.queue
-                .write_buffer(&gpu.indices, 0, bytemuck::cast_slice(&layer.indices));
+            if gpu.last_uvs != layer.uvs {
+                self.queue
+                    .write_buffer(&gpu.uvs, 0, bytemuck::cast_slice(&layer.uvs));
+                gpu.last_uvs.clone_from(&layer.uvs);
+            }
+            if gpu.last_indices != layer.indices {
+                self.queue
+                    .write_buffer(&gpu.indices, 0, bytemuck::cast_slice(&layer.indices));
+                gpu.last_indices.clone_from(&layer.indices);
+            }
             self.queue.write_buffer(
                 &gpu.uniform,
                 0,

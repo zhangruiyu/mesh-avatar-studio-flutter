@@ -81,7 +81,13 @@ class MeshAvatarStudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                 override fun onSurfaceCleanup() {
                     if (producer !== surfaceProducer || detached) return
                     // 后台 Surface 可能被系统销毁；不能在恢复时继续使用旧窗口。
-                    worker.post { if (handle != 0L) nativeSurface(handle, null) }
+                    worker.post {
+                        if (handle != 0L) {
+                            // GPU 异常后的清理也可能失败，不能让异常逃出工作线程导致进程退出。
+                            try { nativeSurface(handle, null) }
+                            catch (error: Exception) { main.post { channel.invokeMethod("renderError", error.message) } }
+                        }
+                    }
                 }
             })
             val initialSurface = surfaceProducer.surface

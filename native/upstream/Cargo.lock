@@ -1066,8 +1066,10 @@ dependencies = [
 name = "mesh-avatar-ffi"
 version = "0.1.0"
 dependencies = [
+ "foreign-types",
  "mesh-avatar-core",
  "mesh-avatar-wgpu",
+ "metal",
  "pollster",
  "serde",
  "serde_json",

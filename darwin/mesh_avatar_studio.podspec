@@ -14,7 +14,7 @@ Pod::Spec.new do |s|
   s.ios.deployment_target = '13.0'
   s.osx.deployment_target = '10.15'
   s.swift_version = '5.0'
-  s.frameworks = 'Metal', 'QuartzCore', 'CoreGraphics', 'Foundation', 'Accelerate', 'CoreVideo'
+  s.frameworks = 'Metal', 'QuartzCore', 'CoreGraphics', 'Foundation', 'CoreVideo'
   s.libraries = 'iconv'
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
 end

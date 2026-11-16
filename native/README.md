@@ -21,3 +21,13 @@ Android 默认构建全部三个 ABI。只补编译 32 位 ARM 时可使用 `pyt
 - 参数、口型、衣物等校验在 Rust 统一执行，各平台桥接负责串行调用和字符串内存管理。
 - 新控制测试使用官方 example 模型，配饰/衣物夹具只在测试内存中构造，不生成或提交新素材。运行命令：`cargo test -p mesh-avatar-ffi controls::tests --manifest-path native/upstream/Cargo.toml`。
 - Cargo.lock 只将已有 serde 加入 FFI 直接依赖，没有新增第三方包或改变版本，原许可清单继续适用。
+
+## Flutter GPU 直接输出扩展
+
+`0.1.0-dev.3` 新增 `mesh-avatar-ffi/src/render/direct.rs`，只在 Android/Apple 且启用 `render` 时编译。Android 使用 Surface 交换链，Apple 接收同一 Metal 设备创建的 BGRA 纹理；异步完成序号用于保证 Swift 发布前 GPU 已写完。旧 `mesh_avatar_renderer_*` 同步回读入口保留，供已有 C 调用者和对照测试使用。
+
+Apple 桥接持有 CVPixelBuffer 和 CVMetalTexture 到提交完成，池最多三张、待完成任务最多两帧。关闭时先等待并销毁 GPU 渲染器，再释放缓冲和模型。Android 先解除/销毁交换链，之后才释放 ANativeWindow。正常逐帧路径没有同步读回 CPU。
+
+Cargo.lock 只把已经存在的 `metal 0.32`、`foreign-types 0.5` 列为 Apple 直接依赖，没有增加第三方版本，现有许可文件继续适用。`mesh-avatar-wgpu` 缓存 UV/索引的实际内容，不能只凭长度判断不变。
+
+在有 Metal 的 macOS 上执行 `cargo test -p mesh-avatar-ffi --features render direct::tests --manifest-path native/upstream/Cargo.toml`，会用官方 example 模型比较共享纹理与旧输出的每个像素，并验证透明背景、完成序号与释放后的无效句柄。

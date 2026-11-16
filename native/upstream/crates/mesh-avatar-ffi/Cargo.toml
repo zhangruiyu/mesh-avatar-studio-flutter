@@ -10,7 +10,7 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 
 [features]
 default = []
-render = ["dep:mesh-avatar-wgpu", "dep:pollster"]
+render = ["dep:mesh-avatar-wgpu", "dep:pollster", "dep:metal", "dep:foreign-types"]
 
 [dependencies]
 serde.workspace = true
@@ -21,3 +21,7 @@ pollster = { workspace = true, optional = true }
 
 [dev-dependencies]
 zip.workspace = true
+
+[target.'cfg(target_vendor = "apple")'.dependencies]
+metal = { version = "0.32", optional = true }
+foreign-types = { version = "0.5", optional = true }

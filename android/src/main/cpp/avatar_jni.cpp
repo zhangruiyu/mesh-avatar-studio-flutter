@@ -15,16 +15,15 @@ struct Avatar {
   MaHandle model = 0;
   MaRenderer renderer = 0;
   ANativeWindow* window = nullptr;
-  std::vector<uint8_t> rgba = std::vector<uint8_t>(600 * 800 * 4);
   double elapsed = 0;
   double renderMs = 0;
   uint64_t frames = 0;
   bool speaking = false;
   bool mouthDemo = false;
   ~Avatar() {
+    // GPU 交换链引用窗口和模型，必须先释放，再释放两者。
+    if (renderer) mesh_avatar_gpu_destroy(renderer);
     if (window) ANativeWindow_release(window);
-    // 渲染器持有模型引用，销毁顺序不能倒过来。
-    if (renderer) mesh_avatar_renderer_destroy(renderer);
     if (model) mesh_avatar_destroy(model);
   }
 };
@@ -63,8 +62,7 @@ Java_dev_meshavatar_mesh_1avatar_1studio_MeshAvatarStudioPlugin_nativeCreate(JNI
       if (file.empty()) throw std::runtime_error("模型路径不能为空");
       check(mesh_avatar_open_path(file.c_str(), &avatar->model));
     }
-    MaRenderOptions options{600, 800, 1, MA_FIT_COVER, 0.06, 0.02};
-    check(mesh_avatar_renderer_create(avatar->model, &options, &avatar->renderer));
+    // 等 Flutter Surface 就绪后再创建与该窗口兼容的 GPU 渲染器。
     return reinterpret_cast<jlong>(avatar.release());
   } catch (const std::exception& error) { report(env, error); return 0; }
 }
@@ -73,11 +71,16 @@ extern "C" JNIEXPORT void JNICALL
 Java_dev_meshavatar_mesh_1avatar_1studio_MeshAvatarStudioPlugin_nativeSurface(JNIEnv* env, jobject, jlong handle, jobject surface) {
   try {
     auto& avatar = get(handle);
+    if (avatar.renderer) check(mesh_avatar_gpu_set_surface(avatar.renderer, nullptr));
     if (avatar.window) { ANativeWindow_release(avatar.window); avatar.window = nullptr; }
     if (surface) {
       avatar.window = ANativeWindow_fromSurface(env, surface);
-      if (!avatar.window || ANativeWindow_setBuffersGeometry(avatar.window, 600, 800, WINDOW_FORMAT_RGBA_8888) != 0) {
-        throw std::runtime_error("无法建立安卓原生纹理窗口");
+      if (!avatar.window) throw std::runtime_error("无法建立安卓原生纹理窗口");
+      if (avatar.renderer) {
+        check(mesh_avatar_gpu_set_surface(avatar.renderer, avatar.window));
+      } else {
+        MaRenderOptions options{600, 800, 1, MA_FIT_COVER, 0.06, 0.02};
+        check(mesh_avatar_gpu_create(avatar.model, &options, avatar.window, &avatar.renderer));
       }
     }
   } catch (const std::exception& error) { report(env, error); }
@@ -95,19 +98,10 @@ Java_dev_meshavatar_mesh_1avatar_1studio_MeshAvatarStudioPlugin_nativeRender(JNI
       check(mesh_avatar_set_voice_level(avatar.model, level));
     }
     check(mesh_avatar_tick(avatar.model, dt));
-    check(mesh_avatar_renderer_render(avatar.renderer, avatar.rgba.data(), avatar.rgba.size(), MA_RGBA_PREMULTIPLIED));
-    ANativeWindow_Buffer buffer{};
-    const int status = ANativeWindow_lock(avatar.window, &buffer, nullptr);
-    if (status != 0) throw std::runtime_error("安卓纹理窗口无法写入，错误码 " + std::to_string(status));
-    // 上游输出 RGBA，安卓 Surface 也是 RGBA；逐行处理设备实际 stride，不假设紧密排列。
-    if (buffer.width != 600 || buffer.height != 800 || buffer.stride < 600 || buffer.format != WINDOW_FORMAT_RGBA_8888) {
-      ANativeWindow_unlockAndPost(avatar.window);
-      throw std::runtime_error("安卓纹理尺寸或格式不匹配");
-    }
-    for (int y = 0; y < 800; ++y) {
-      std::memcpy(static_cast<uint8_t*>(buffer.bits) + y * buffer.stride * 4, avatar.rgba.data() + y * 600 * 4, 600 * 4);
-    }
-    if (ANativeWindow_unlockAndPost(avatar.window) != 0) throw std::runtime_error("提交安卓纹理失败");
+    // GPU 直接提交 Flutter 的 Surface，省去回读、逐行 memcpy 和 CPU 锁定窗口。
+    uint8_t presented = 0;
+    check(mesh_avatar_gpu_draw_surface(avatar.renderer, &presented));
+    if (!presented) return false;
     avatar.frames++;
     avatar.renderMs += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
     return true;

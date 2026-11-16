@@ -2,7 +2,7 @@
 
 Dart 包名：`mesh_avatar_studio`；仓库：<https://github.com/zhangruiyu/mesh-avatar-studio-flutter>。
 
-首版使用 `0.1.0-dev.2`，明确作为预览版。目录中包含实际需要的原生库，不通过安装脚本临时从个人机器下载。
+当前使用 `0.1.0-dev.3`，明确作为预览版。目录中包含实际需要的原生库，不通过安装脚本临时从个人机器下载。
 
 发布前在包根目录执行：
 

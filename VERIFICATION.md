@@ -1,3 +1,23 @@
+# 0.1.0-dev.3 验证记录
+
+验证日期：2026-11-16。本轮将 Android、iOS、macOS 播放器改为 GPU 直接输出；性能数据和限制见 [PERFORMANCE.md](PERFORMANCE.md)。
+
+| 验证项 | 结果 |
+| --- | --- |
+| Flutter 静态检查 / Dart 单元测试 | 无问题 / 10 项通过 |
+| Rust FFI，启用 render | 隔离副本补齐官方旧样例后，16 项通过，包含共享 Metal 逐像素对照 |
+| Android ARM64 真机 | 完整原生 API、示例点击通过；正式样例 3 次真实前后台恢复，仍显示 30 帧/秒 |
+| iOS ARM64 模拟器 | 完整原生 API 与示例点击通过 |
+| macOS ARM64 | 完整原生 API 通过；共享纹理基准运行通过 |
+| Android ARMv7 / ARM64 / x64 | Release APK 编译、架构与 16 KiB 对齐检查通过 |
+| iOS ARM64 真机架构 | Release 无签名编译通过，未进行 iPhone 真机验收 |
+| 原生发布库 | Android 三架构、Apple 五目标已重编译，7 份随包库清单校验通过（含未变更的鸿蒙库） |
+| HarmonyOS | GPU 扩展不编入 OHOS，原有 GLES 路径和二进制未变；本轮未做鸿蒙真机验收 |
+
+控制 API、官方 Miko 随包决定和无 WebView/无制作编辑器范围保持不变。ARM32、Android x64、Intel Mac、x64 iOS 模拟器本轮仅编译/产物检查。性能测试是短时 Debug 采样，不等于功耗或所有机型的 Release 收益。
+
+以下保留上一版本的验收记录，不将旧验证冒充本轮结果。
+
 # 0.1.0-dev.2 验证记录
 
 验证日期：2026-11-16。仅验证独立插件与公开 example，没有接入或修改业务 App。

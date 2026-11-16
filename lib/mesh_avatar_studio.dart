@@ -185,7 +185,8 @@ class MeshAvatarMotionEvent {
   final String? id;
 }
 
-/// 原生绘制状态；renderMilliseconds 包含绘制与提交，并非纯 GPU 时间。
+/// 原生绘制状态；renderMilliseconds 为 CPU 准备和提交耗时，并非纯 GPU 时间。
+/// GPU 直接输出后不再包含同步像素回读等待，不能单靠它推算 GPU 性能。
 @immutable
 class MeshAvatarStats {
   /// 从平台通道返回的数据构建状态。

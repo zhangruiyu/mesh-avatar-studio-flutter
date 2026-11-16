@@ -289,3 +289,7 @@ pub extern "C" fn mesh_avatar_renderer_destroy(renderer: MaRenderer) -> MaStatus
 
 #[cfg(test)]
 mod tests;
+
+// 直接输出是 Flutter 扩展；无图形平台和旧回读调用保持原行为。
+#[cfg(any(target_os = "android", target_vendor = "apple"))]
+mod direct;

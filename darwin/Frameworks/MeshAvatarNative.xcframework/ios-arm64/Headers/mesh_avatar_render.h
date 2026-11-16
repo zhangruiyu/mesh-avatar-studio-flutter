@@ -109,6 +109,24 @@ MaStatus mesh_avatar_renderer_resize(MaRenderer renderer, uint32_t width, uint32
  */
 MaStatus mesh_avatar_renderer_destroy(MaRenderer renderer);
 
+/* Flutter 直接输出扩展。旧回读接口保留；以下接口不传输整帧 CPU 像素。
+ * Android: window 为持有引用的 ANativeWindow；先解除 Surface/销毁，再释放窗口。
+ * Apple: window 传 NULL；使用返回的同一 MTLDevice 创建 CVMetalTexture。
+ * Metal 绘制只提交任务。调用方持有 CVPixelBuffer/CVMetalTexture，直到 poll 返回完成序号。
+ * 渲染器必须先于模型销毁。所有 out 指针必须有效、不重叠。
+ */
+MaStatus mesh_avatar_gpu_create(MaHandle avatar, const MaRenderOptions *options, void *window, MaRenderer *out);
+MaStatus mesh_avatar_gpu_destroy(MaRenderer renderer);
+#if defined(__ANDROID__)
+MaStatus mesh_avatar_gpu_set_surface(MaRenderer renderer, void *window);
+MaStatus mesh_avatar_gpu_draw_surface(MaRenderer renderer, uint8_t *presented);
+#endif
+#if defined(__APPLE__)
+MaStatus mesh_avatar_gpu_metal_device(MaRenderer renderer, void **out);
+MaStatus mesh_avatar_gpu_draw_metal(MaRenderer renderer, void *texture, uint64_t *serial);
+MaStatus mesh_avatar_gpu_poll(MaRenderer renderer, uint64_t *completed);
+#endif
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

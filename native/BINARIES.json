@@ -4,33 +4,33 @@
   "files": [
     {
       "path": "android/src/main/jniLibs/arm64-v8a/libmesh_avatar_ffi.so",
-      "bytes": 10531024,
-      "sha256": "edb94fbf7ca1cca48ec9598b59a6c6429f54448d6ff1ea128548a23c0c9072c5"
+      "bytes": 10674312,
+      "sha256": "6872d53746723d115d89aa88f3d3af8511f7f49822ad70c8cfb519d60d05936a"
     },
     {
       "path": "android/src/main/jniLibs/armeabi-v7a/libmesh_avatar_ffi.so",
-      "bytes": 7419984,
-      "sha256": "103de7e0e191fd70f60c04f1d63073c108d9611b4798eb28ec06d0e0531b2c26"
+      "bytes": 7512992,
+      "sha256": "c740397734bc379f303bbf15e5553723d48c6c234238b3b2102d326b142a10eb"
     },
     {
       "path": "android/src/main/jniLibs/x86_64/libmesh_avatar_ffi.so",
-      "bytes": 10258976,
-      "sha256": "434bd1743d88062972f0dffa2b80eea7c8e80dcd3bfd4e97c8066c1fc5af7357"
+      "bytes": 10398608,
+      "sha256": "85975aa473f880da8532c4edd523f0d0c285072b38cd0a54fd1782284cee055f"
     },
     {
       "path": "darwin/Frameworks/MeshAvatarNative.xcframework/ios-arm64/libmesh_avatar_ffi.a",
-      "bytes": 40048040,
-      "sha256": "5b3e11c1009762a2b9e8193ba0d3b733f1eac6c92b57b181f607142818b54569"
+      "bytes": 40213976,
+      "sha256": "d771400728002db9490f036a56a65fc53e984b85c1f8a2e9bafc1481f1569c49"
     },
     {
       "path": "darwin/Frameworks/MeshAvatarNative.xcframework/ios-arm64_x86_64-simulator/libmesh_avatar_ffi.a",
-      "bytes": 78977000,
-      "sha256": "fbeabc4a527f0b64f04c896499986a461d68998efd2ee35a3d96c9b66406750e"
+      "bytes": 79275168,
+      "sha256": "a847647faaadbec57320a4fd839f7add3c0c7f649bd198b938708728ba162973"
     },
     {
       "path": "darwin/Frameworks/MeshAvatarNative.xcframework/macos-arm64_x86_64/libmesh_avatar_ffi.a",
-      "bytes": 80265192,
-      "sha256": "5dd27c1a81a52f67b1014c07f52308d1400ac813267febe5d40b6293506448fd"
+      "bytes": 80572152,
+      "sha256": "681d1d40cd1d2875f6304e6336035ee23d99551914975a0ebd190233200fcf00"
     },
     {
       "path": "ohos/libs/arm64-v8a/libmesh_avatar_ffi.so",
