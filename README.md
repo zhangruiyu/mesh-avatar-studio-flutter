@@ -4,18 +4,18 @@ Flutter 原生 2D 网格角色播放器，Dart 包名为 `mesh_avatar_studio`。
 
 这是基于上游开源运行库开发的独立 Flutter 插件，并非上游官方插件。它读取 Mesh Avatar Studio 的 `.mavatar` ZIP 或导出目录，**不能直接读取 Live2D Cubism 的 `.moc3` / `.model3.json`**。
 
-当前为 `0.1.0-dev.2` 预览版。插件不会自动下载模型、播放声音或申请录音权限。`example` 已内置官方 Miko 示例角色，运行即可体验；普通应用依赖插件不会自动打包该示例资源。
+当前为 `0.1.0-dev.5` 预览版。插件不会自动下载模型、播放声音或申请录音权限。`example` 已内置官方 Miko 示例角色，运行即可体验；普通应用依赖插件不会自动打包该示例资源。
 
 ## 安装
 
-发布到 pub.dev 后：
+通过 pub.dev 安装预览版：
 
 ```yaml
 dependencies:
-  mesh_avatar_studio: ^0.1.0-dev.2
+  mesh_avatar_studio: ^0.1.0-dev.5
 ```
 
-尚未发布时，可通过本地目录依赖接入：
+本地开发时，也可通过目录依赖接入：
 
 ```yaml
 dependencies:
@@ -176,7 +176,7 @@ await subscription.cancel();
 
 不支持 Web、Windows、Linux 和 Android 32 位 x86。Android 支持 `android-arm,android-arm64,android-x64`，对应 `armeabi-v7a,arm64-v8a,x86_64`。宿主如果设置了 `ndk.abiFilters`，需包含希望支持的架构。32 位 ARM 的原生库与 APK 已编译验证，当前未具备可运行 32 位应用的设备；具体机型仍须验证 Vulkan 渲染，不能仅凭 ABI 判断兼容。插件使用 Java 17、NDK 28.2 和 CMake 3.22.1。鸿蒙须使用支持 `ohos` 插件的 Flutter 分支；普通 Flutter SDK 可正常用于其他平台。
 
-当前原生画布固定为 **600 × 800，约 30 帧/秒**。`MeshAvatarView.fit` 控制这张纹理在组件中的缩放，默认 `BoxFit.contain`；不能恢复原生画布已裁掉的内容。Android 使用 GPU 交换链直接输出到 Flutter Surface；iOS/macOS 使用 Metal 直接写入 IOSurface 共享的 BGRA 缓冲区，GPU 完成后才交给 Flutter。播放器不再执行整帧像素回读、逐行复制或 CPU 色彩通道转换。Apple 缓冲池最多三张，合成器占用时跳过绘制，避免无限分配；Android/Apple 的网格 UV 和索引仅在内容变化时上传。鸿蒙同样直接输出原生纹理，并按图层缓存顶点、UV、索引：内容变化才上传，容量足够时复用，退出图层立即释放。仍需结合机型验收，当前不作为多角色或高帧率方案。
+当前原生画布固定为 **600 × 800，约 30 帧/秒**。`MeshAvatarView.fit` 控制这张纹理在组件中的缩放，默认 `BoxFit.contain`；不能恢复原生画布已裁掉的内容。Android 使用 GPU 交换链直接输出到 Flutter Surface；iOS/macOS 使用 Metal 直接写入 IOSurface 共享的 BGRA 缓冲区，GPU 完成后才交给 Flutter。播放器不再执行整帧像素回读、逐行复制或 CPU 色彩通道转换。Apple 缓冲池最多三张，合成器占用时跳过绘制，避免无限分配；Android/Apple 的网格 UV 和索引仅在内容变化时上传。鸿蒙直接输出原生纹理，在图层间复用三个流式缓冲；已撤回按图层保存整份网格的缓存方案，保留平均耗时统计和有上限的窗口请求超时。仍需结合机型验收，当前不作为多角色或高帧率方案。
 
 `renderMilliseconds` 表示本次加载以来成功提交帧的准备与提交平均耗时，暂停不累计、重新加载清零；鸿蒙包含 EGL 提交等待。这不是纯 GPU 时间，也不是屏幕端到端延迟。优化前后采样与限制见 [性能验证](PERFORMANCE.md)。
 
@@ -198,3 +198,23 @@ flutter run -d macos --dart-define=AVATAR_PATH=/绝对路径/角色.mavatar
 ## 原生源码、许可与维护
 
 上游固定版本、构建方式和二进制校验见 [native/README.md](native/README.md) 与 [native/BINARIES.json](native/BINARIES.json)。插件代码和上游运行库为 MIT；**Miko 角色素材不属于 MIT**，需遵守[官方角色条款](https://miko.aituberonair.com/#terms)，原始说明保存在 `example/assets/miko`；依赖的许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。预编译库只包含运行时，不包含角色素材。
+
+
+<a id="native-upstream"></a>
+
+## native 跟随上游主仓库（Codex 维护入口）
+
+**原生算法跟随官方主仓库更新，本插件不维护独立的变形算法优化分支。** Flutter 接口、纹理传递、生命周期和平台兼容由本插件维护。每次用户要求更新 native 时，Codex 应先查询上游最新变更，再同步相关原生代码；仅发布或修改文档时不顺带升级算法。
+
+- 上游主仓库：[shinshin86/mesh-avatar-studio](https://github.com/shinshin86/mesh-avatar-studio)。
+- 上游 native 入口：[native 目录](https://github.com/shinshin86/mesh-avatar-studio/tree/main/native)，[native 提交记录](https://github.com/shinshin86/mesh-avatar-studio/commits/main/native)。
+- 当前同步基线：[`6d2817aa0869365a0a5634241bf50af6bfd78a2a`](https://github.com/shinshin86/mesh-avatar-studio/tree/6d2817aa0869365a0a5634241bf50af6bfd78a2a/native)。这不是“始终最新”的声明。
+- 本地对应关系：上游 `native/` → 本仓库 `native/upstream/`；C 头文件 → `native/include/`。已维护的 Flutter 控制接口、GPU 直接输出补丁和构建说明见 [native/README.md](native/README.md)。
+
+同步步骤：
+
+1. 读取本节、`native/README.md` 和 `native/BINARIES.json`，确认当前基线与现有接入补丁。在独立的上游检出目录获取默认分支，比较旧基线到候选提交的 `native/`、C ABI、依赖与模型格式变更，记录准备跟随的完整提交号。
+2. 将相关改动合入 `native/upstream/`，逐项保留或用上游等价实现替换本地控制接口和 GPU 输出补丁。不能直接整目录覆盖，也不能只改基线号。仅同步播放器需要的运行库，不引入制作编辑器、用户角色或调试签名。
+3. 源码变化后重建 Android 三 ABI、Apple 的 iOS/模拟器/macOS 切片和鸿蒙 ARM64；核对 `native/include/` 与各平台调用一致。命令见 `tool/build_native.py` 和 `native/README.md`，不要复制其他项目或临时实验的二进制。
+4. 执行 Dart 分析、单元测试、Rust 回归和各平台集成/构建检查；使用官方 Miko 验证动作、口型、暂停恢复和释放。涉及渲染/变形时比较画面，涉及性能时固定画布和帧率做真机对照。缺失的设备覆盖如实记录。
+5. 同步更新本节、`native/README.md`、`THIRD_PARTY_NOTICES.md`、`native/BINARIES.json` 以及 `tool/check_binaries.py` 中的构建元信息（当前脚本写有固定基线和 Rust 版本）；依赖变化时重新核对第三方许可。更新 `CHANGELOG.md`，按 [PUBLISHING.md](PUBLISHING.md) 预检，并依照当前用户授权提交、推送或发布。

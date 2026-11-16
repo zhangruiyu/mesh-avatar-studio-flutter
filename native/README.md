@@ -1,6 +1,8 @@
 # 原生运行库
 
-上游提交：`6d2817aa0869365a0a5634241bf50af6bfd78a2a`，MIT。
+上游主仓库：[shinshin86/mesh-avatar-studio](https://github.com/shinshin86/mesh-avatar-studio)，原生代码来自其 `native/` 目录。
+
+当前同步基线：[`6d2817aa0869365a0a5634241bf50af6bfd78a2a`](https://github.com/shinshin86/mesh-avatar-studio/tree/6d2817aa0869365a0a5634241bf50af6bfd78a2a/native)，MIT。Codex 后续同步步骤统一见 [根 README 的维护入口](../README.md#native-upstream)。
 
 `upstream` 保留 Rust workspace、三个运行库 crate 和桌面 crate 的源码及 Cargo.lock，便于追溯和重新编译。它不包含上游演示角色；依赖演示模型的上游测试应在完整上游 checkout 中运行。Flutter 接入层位于 `android`、`darwin`、`ohos`，不在 Rust 核心中混入业务逻辑。
 
