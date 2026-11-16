@@ -4,6 +4,8 @@
 
 `upstream` 保留 Rust workspace、三个运行库 crate 和桌面 crate 的源码及 Cargo.lock，便于追溯和重新编译。它不包含上游演示角色；依赖演示模型的上游测试应在完整上游 checkout 中运行。Flutter 接入层位于 `android`、`darwin`、`ohos`，不在 Rust 核心中混入业务逻辑。
 
+后续原生算法优先跟随上游官方更新；本插件主要维护 Flutter 接口、纹理传递、生命周期和平台兼容，避免长期维护独立的变形算法优化分支。
+
 使用者无需编译 Rust。维护者可执行 `python3 tool/build_native.py apple` 或 `python3 tool/build_native.py android --ndk /Android/NDK/路径`、`python3 tool/build_native.py ohos --ohos-native /DevEco/SDK/native/路径`。需要 macOS、Xcode、Rust/rustup、对应平台 SDK；脚本会安装目标工具链并更新二进制。构建目标写在脚本里，不依赖维护者个人目录。
 
 发布前执行 `python3 tool/check_binaries.py --write` 更新校验清单，再运行不带 `--write` 的命令核对。改变上游或 Cargo.lock 后，还要重新整理第三方许可证并执行各平台集成测试；仅更新二进制校验不代表通过验收。
@@ -32,10 +34,10 @@ Cargo.lock 只把已经存在的 `metal 0.32`、`foreign-types 0.5` 列为 Apple
 
 在有 Metal 的 macOS 上执行 `cargo test -p mesh-avatar-ffi --features render direct::tests --manifest-path native/upstream/Cargo.toml`，会用官方 example 模型比较共享纹理与旧输出的每个像素，并验证透明背景、完成序号与释放后的无效句柄。
 
-## 鸿蒙网格缓存
+## 鸿蒙缓冲与耗时统计
 
-`0.1.0-dev.4` 在 `ohos/src/main/cpp/avatar_mesh_cache.h` 保存各图层的 GL 缓冲与上一份网格内容。图层名称而非绘制序号作为标识；顶点、UV 和索引按内容比较，增长才扩容，缩小后保留容量。透明但仍存在的图层保留缓存，真正退出帧的图层立即删除；关闭模型时在当前 EGL 上下文内统一释放。缓存会增加 CPU/GPU 内存占用，不保证整进程 CPU 一定下降。
+鸿蒙恢复在图层间复用三个流式 GL 缓冲，撤回 dev.4 引入的按图层网格缓存，不再长期保留每层网格的 CPU 副本。对应缓存实现与专用测试一并删除。Rust 变形核心与随包运行库保持此前已提交版本，本轮不引入算法优化，也不承诺整进程 CPU 或内存下降。
 
-`renderMs` 现在返回成功帧累计耗时除以帧数，包括动作计算、上传、绘制和 EGL 提交等待，不包含限帧休眠和暂停。窗口请求缓冲最多等待 1000ms，避免复杂页面短暂占用消费者时原来的 100ms 超时触发驱动 GL_OUT_OF_MEMORY；消费者持续不可用时仍有上限，不无限阻塞关闭。
+保留 dev.4 的统计与超时修复：`renderMs` 返回成功帧累计耗时除以帧数，包括动作计算、上传、绘制和 EGL 提交等待，不包含限帧休眠和暂停。窗口请求缓冲最多等待 1000ms，避免复杂页面短暂占用消费者时原来的 100ms 超时触发驱动 GL_OUT_OF_MEMORY；消费者持续不可用时仍有上限，不无限阻塞关闭。
 
-运行 `python3 tool/test_ohos_mesh_cache.py --ohos-native /DevEco/SDK/native/路径` 可在开发机使用 SDK GLES 类型声明与测试内存缓冲验证上传结果、容量复用、图层重排/隐藏/删除及清空重建。测试启用 AddressSanitizer 和 UndefinedBehaviorSanitizer；不代替鸿蒙真实 GLES 驱动测试。本次 Rust `.so` 未变，修改的 C++ 接入层随宿主 HAP 编译。
+示例的 `render_benchmark_test.dart` 支持通过 `BENCH_WARMUP_SECONDS`、`BENCH_SECONDS` 和 `BENCH_ROUNDS` 延长对照采样。使用 `flutter drive --profile --no-enable-dart-profiling --driver test_driver/integration_test.dart --target integration_test/render_benchmark_test.dart` 运行；保持设备前台、画布和帧率一致，熄屏或后台暂停的样本不能当作性能收益。

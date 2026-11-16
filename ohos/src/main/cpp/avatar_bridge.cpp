@@ -14,7 +14,6 @@
 #include <vector>
 #include "mesh_avatar.h"
 #include "avatar_shaders.h"
-#include "avatar_mesh_cache.h"
 
 namespace {
 constexpr int width = 600, height = 800;
@@ -55,8 +54,7 @@ void render(uint64_t surfaceId, const std::string path, const std::vector<uint8_
   EGLDisplay display = EGL_NO_DISPLAY;
   EGLSurface surface = EGL_NO_SURFACE;
   EGLContext context = EGL_NO_CONTEXT;
-  GLuint program = 0, vao = 0, vertex = 0, fragment = 0;
-  AvatarMeshCache meshCache;
+  GLuint program = 0, vao = 0, buffers[3] = {}, vertex = 0, fragment = 0;
   std::vector<GLuint> textures;
   std::vector<std::string> textureNames;
   try {
@@ -96,6 +94,7 @@ void render(uint64_t surfaceId, const std::string path, const std::vector<uint8_
     if (!linked) throw std::runtime_error("着色器链接失败");
     glUseProgram(program);
     glGenVertexArrays(1, &vao); glBindVertexArray(vao);
+    glGenBuffers(3, buffers);
     auto uniform = [&](const char* name) { return glGetUniformLocation(program, name); };
     GLint pos = glGetAttribLocation(program, "aPos"), uv = glGetAttribLocation(program, "aUv");
     glEnableVertexAttribArray(pos); glEnableVertexAttribArray(uv);
@@ -155,11 +154,9 @@ void render(uint64_t surfaceId, const std::string path, const std::vector<uint8_
       glUniform1fv(botLoc, 48, &u.eye_bot[0][0]); glUniform4fv(eyesLoc, 2, u.eyes);
       glUniform4fv(mouthLoc, 1, u.mouth); glUniform4fv(mouthStateLoc, 1, u.mouth_state);
       glUniform4fv(cheeksLoc, 1, u.cheeks); glUniform1f(cheekLoc, u.cheek);
-      meshCache.beginFrame();
       for (size_t i = 0; i < frame.layer_count; ++i) {
         if (stopped) break;
         const auto& layer = frame.layers[i];
-        meshCache.markPresent(layer.name);
         if (!layer.index_count || layer.alpha <= 0 || layer.texture_id >= textures.size()) continue;
         glBindTexture(GL_TEXTURE_2D, textures[layer.texture_id]);
         int face = layer.face ? 1 : layer.eye_ball >= 0 ? 2 + layer.eye_ball : 0;
@@ -168,10 +165,17 @@ void render(uint64_t surfaceId, const std::string path, const std::vector<uint8_
         if (name == "sprites/eyes_half_1.png") face = 5;
         glUniform1i(faceLoc, face); glUniform1f(alphaLoc, layer.alpha);
         glUniform4f(rectLoc, layer.rect[0], layer.rect[1], layer.rect[2], layer.rect[3]);
-        meshCache.bind(layer, pos, uv);
+        // 三个流式缓冲在图层间复用，避免为每层长期保留 CPU 副本和 GL 缓冲。
+        glBindBuffer(GL_ARRAY_BUFFER, buffers[0]);
+        glBufferData(GL_ARRAY_BUFFER, layer.vertex_count * 2 * sizeof(float), layer.positions, GL_STREAM_DRAW);
+        glVertexAttribPointer(pos, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+        glBindBuffer(GL_ARRAY_BUFFER, buffers[1]);
+        glBufferData(GL_ARRAY_BUFFER, layer.vertex_count * 2 * sizeof(float), layer.uvs, GL_STREAM_DRAW);
+        glVertexAttribPointer(uv, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers[2]);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, layer.index_count * sizeof(uint32_t), layer.indices, GL_STREAM_DRAW);
         glDrawElements(GL_TRIANGLES, layer.index_count, GL_UNSIGNED_INT, nullptr);
       }
-      meshCache.endFrame();
       if (stopped) { lock.lock(); break; }
       const GLenum drawError = glGetError();
       if (drawError != GL_NO_ERROR)
@@ -190,7 +194,7 @@ void render(uint64_t surfaceId, const std::string path, const std::vector<uint8_
   }
   // 不调用 eglTerminate：默认显示由 Flutter 共享，不能销毁它的显示连接。
   if (context != EGL_NO_CONTEXT && eglGetCurrentContext() == context) {
-    meshCache.clear();
+    glDeleteBuffers(3, buffers);
     glDeleteTextures(textures.size(), textures.data());
     glDeleteVertexArrays(1, &vao);
     if (program) glDeleteProgram(program);
