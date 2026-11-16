@@ -23,7 +23,7 @@ dependencies:
     path: ../mesh-avatar-studio
 ```
 
-正常 Flutter 插件自动注册，不需要把 Swift、Kotlin 或 ArkTS 代码复制到业务项目。Apple 平台当前通过 CocoaPods 接入；依赖 Rust 的预编译库已包含在插件中，使用者不需要安装 Rust。
+最低要求 Flutter 3.29（Android 原生纹理回收接口所需）；本轮实际验收 SDK 为 Flutter 3.47.9，较低版本未做完整运行验收。正常 Flutter 插件自动注册，不需要把 Swift、Kotlin 或 ArkTS 代码复制到业务项目。Apple 平台当前通过 CocoaPods 接入；依赖 Rust 的预编译库已包含在插件中，使用者不需要安装 Rust。
 
 ## 最小用法
 
@@ -217,4 +217,4 @@ flutter run -d macos --dart-define=AVATAR_PATH=/绝对路径/角色.mavatar
 2. 将相关改动合入 `native/upstream/`，逐项保留或用上游等价实现替换本地控制接口和 GPU 输出补丁。不能直接整目录覆盖，也不能只改基线号。仅同步播放器需要的运行库，不引入制作编辑器、用户角色或调试签名。
 3. 源码变化后重建 Android 三 ABI、Apple 的 iOS/模拟器/macOS 切片和鸿蒙 ARM64；核对 `native/include/` 与各平台调用一致。命令见 `tool/build_native.py` 和 `native/README.md`，不要复制其他项目或临时实验的二进制。
 4. 执行 Dart 分析、单元测试、Rust 回归和各平台集成/构建检查；使用官方 Miko 验证动作、口型、暂停恢复和释放。涉及渲染/变形时比较画面，涉及性能时固定画布和帧率做真机对照。缺失的设备覆盖如实记录。
-5. 同步更新本节、`native/README.md`、`THIRD_PARTY_NOTICES.md`、`native/BINARIES.json` 以及 `tool/check_binaries.py` 中的构建元信息（当前脚本写有固定基线和 Rust 版本）；依赖变化时重新核对第三方许可。更新 `CHANGELOG.md`，按 [PUBLISHING.md](PUBLISHING.md) 预检，并依照当前用户授权提交、推送或发布。
+5. 同步更新本节、`native/README.md`、`THIRD_PARTY_NOTICES.md`、`native/BINARIES.json` 以及 `tool/check_binaries.py` 中的构建元信息（当前脚本写有固定基线和 Rust 版本）；运行 `python3 tool/check_binaries.py --write` 更新哈希，再去掉 `--write` 核验。依赖变化时重新核对第三方许可。更新 `CHANGELOG.md`，按 [PUBLISHING.md](PUBLISHING.md) 预检，并依照当前用户授权提交、推送或发布。
