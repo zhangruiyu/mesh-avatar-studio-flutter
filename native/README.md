@@ -31,3 +31,11 @@ Apple 桥接持有 CVPixelBuffer 和 CVMetalTexture 到提交完成，池最多�
 Cargo.lock 只把已经存在的 `metal 0.32`、`foreign-types 0.5` 列为 Apple 直接依赖，没有增加第三方版本，现有许可文件继续适用。`mesh-avatar-wgpu` 缓存 UV/索引的实际内容，不能只凭长度判断不变。
 
 在有 Metal 的 macOS 上执行 `cargo test -p mesh-avatar-ffi --features render direct::tests --manifest-path native/upstream/Cargo.toml`，会用官方 example 模型比较共享纹理与旧输出的每个像素，并验证透明背景、完成序号与释放后的无效句柄。
+
+## 鸿蒙网格缓存
+
+`0.1.0-dev.4` 在 `ohos/src/main/cpp/avatar_mesh_cache.h` 保存各图层的 GL 缓冲与上一份网格内容。图层名称而非绘制序号作为标识；顶点、UV 和索引按内容比较，增长才扩容，缩小后保留容量。透明但仍存在的图层保留缓存，真正退出帧的图层立即删除；关闭模型时在当前 EGL 上下文内统一释放。缓存会增加 CPU/GPU 内存占用，不保证整进程 CPU 一定下降。
+
+`renderMs` 现在返回成功帧累计耗时除以帧数，包括动作计算、上传、绘制和 EGL 提交等待，不包含限帧休眠和暂停。窗口请求缓冲最多等待 1000ms，避免复杂页面短暂占用消费者时原来的 100ms 超时触发驱动 GL_OUT_OF_MEMORY；消费者持续不可用时仍有上限，不无限阻塞关闭。
+
+运行 `python3 tool/test_ohos_mesh_cache.py --ohos-native /DevEco/SDK/native/路径` 可在开发机使用 SDK GLES 类型声明与测试内存缓冲验证上传结果、容量复用、图层重排/隐藏/删除及清空重建。测试启用 AddressSanitizer 和 UndefinedBehaviorSanitizer；不代替鸿蒙真实 GLES 驱动测试。本次 Rust `.so` 未变，修改的 C++ 接入层随宿主 HAP 编译。

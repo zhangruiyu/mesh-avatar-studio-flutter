@@ -176,9 +176,9 @@ await subscription.cancel();
 
 不支持 Web、Windows、Linux 和 Android 32 位 x86。Android 支持 `android-arm,android-arm64,android-x64`，对应 `armeabi-v7a,arm64-v8a,x86_64`。宿主如果设置了 `ndk.abiFilters`，需包含希望支持的架构。32 位 ARM 的原生库与 APK 已编译验证，当前未具备可运行 32 位应用的设备；具体机型仍须验证 Vulkan 渲染，不能仅凭 ABI 判断兼容。插件使用 Java 17、NDK 28.2 和 CMake 3.22.1。鸿蒙须使用支持 `ohos` 插件的 Flutter 分支；普通 Flutter SDK 可正常用于其他平台。
 
-当前原生画布固定为 **600 × 800，约 30 帧/秒**。`MeshAvatarView.fit` 控制这张纹理在组件中的缩放，默认 `BoxFit.contain`；不能恢复原生画布已裁掉的内容。Android 使用 GPU 交换链直接输出到 Flutter Surface；iOS/macOS 使用 Metal 直接写入 IOSurface 共享的 BGRA 缓冲区，GPU 完成后才交给 Flutter。播放器不再执行整帧像素回读、逐行复制或 CPU 色彩通道转换。Apple 缓冲池最多三张，合成器占用时跳过绘制，避免无限分配；网格 UV 和索引仅在内容变化时上传。仍需结合机型验收，当前不作为多角色或高帧率方案。
+当前原生画布固定为 **600 × 800，约 30 帧/秒**。`MeshAvatarView.fit` 控制这张纹理在组件中的缩放，默认 `BoxFit.contain`；不能恢复原生画布已裁掉的内容。Android 使用 GPU 交换链直接输出到 Flutter Surface；iOS/macOS 使用 Metal 直接写入 IOSurface 共享的 BGRA 缓冲区，GPU 完成后才交给 Flutter。播放器不再执行整帧像素回读、逐行复制或 CPU 色彩通道转换。Apple 缓冲池最多三张，合成器占用时跳过绘制，避免无限分配；Android/Apple 的网格 UV 和索引仅在内容变化时上传。鸿蒙同样直接输出原生纹理，并按图层缓存顶点、UV、索引：内容变化才上传，容量足够时复用，退出图层立即释放。仍需结合机型验收，当前不作为多角色或高帧率方案。
 
-`renderMilliseconds` 表示 CPU 侧准备与提交的平均耗时，不是纯 GPU 时间，也不是屏幕端到端延迟。优化前后采样与限制见 [性能验证](PERFORMANCE.md)。
+`renderMilliseconds` 表示本次加载以来成功提交帧的准备与提交平均耗时，暂停不累计、重新加载清零；鸿蒙包含 EGL 提交等待。这不是纯 GPU 时间，也不是屏幕端到端延迟。优化前后采样与限制见 [性能验证](PERFORMANCE.md)。
 
 ## 示例与验证
 

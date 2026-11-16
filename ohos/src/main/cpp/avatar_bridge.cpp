@@ -14,6 +14,7 @@
 #include <vector>
 #include "mesh_avatar.h"
 #include "avatar_shaders.h"
+#include "avatar_mesh_cache.h"
 
 namespace {
 constexpr int width = 600, height = 800;
@@ -26,7 +27,8 @@ MaHandle avatar = 0;
 std::atomic<bool> stopped{true};
 bool ready = false, paused = false, speaking = false, mouthDemo = false;
 uint64_t frames = 0;
-double renderMs = 0;
+// 累计成功提交帧的耗时，stats 与 Android/Apple 一样返回平均值。
+double renderTotalMs = 0;
 std::string expression = "neutral", error;
 
 void check(MaStatus status) {
@@ -53,7 +55,8 @@ void render(uint64_t surfaceId, const std::string path, const std::vector<uint8_
   EGLDisplay display = EGL_NO_DISPLAY;
   EGLSurface surface = EGL_NO_SURFACE;
   EGLContext context = EGL_NO_CONTEXT;
-  GLuint program = 0, vao = 0, buffers[3] = {}, vertex = 0, fragment = 0;
+  GLuint program = 0, vao = 0, vertex = 0, fragment = 0;
+  AvatarMeshCache meshCache;
   std::vector<GLuint> textures;
   std::vector<std::string> textureNames;
   try {
@@ -63,8 +66,9 @@ void render(uint64_t surfaceId, const std::string path, const std::vector<uint8_
     if (OH_NativeWindow_CreateNativeWindowFromSurfaceId(surfaceId, &window) != 0 || !window)
       throw std::runtime_error("无法取得 Flutter 原生纹理窗口");
     OH_NativeWindow_NativeWindowHandleOpt(window, SET_BUFFER_GEOMETRY, width, height);
-    // 后台没有消费者时，不能无限卡住停止/重新加载操作。
-    OH_NativeWindow_NativeWindowHandleOpt(window, SET_TIMEOUT, 100);
+    // 首次展开复杂 Flutter 页面可能超过 100ms。给消费者最多 1 秒腾出缓冲，
+    // 避免驱动把短暂队列满误报为 GL_OUT_OF_MEMORY；仍有上限，后台关闭不会无限等待。
+    OH_NativeWindow_NativeWindowHandleOpt(window, SET_TIMEOUT, 1000);
     display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
     if (display == EGL_NO_DISPLAY || !eglInitialize(display, nullptr, nullptr))
       throw std::runtime_error("EGL 初始化失败");
@@ -91,7 +95,7 @@ void render(uint64_t surfaceId, const std::string path, const std::vector<uint8_
     glGetProgramiv(program, GL_LINK_STATUS, &linked);
     if (!linked) throw std::runtime_error("着色器链接失败");
     glUseProgram(program);
-    glGenVertexArrays(1, &vao); glBindVertexArray(vao); glGenBuffers(3, buffers);
+    glGenVertexArrays(1, &vao); glBindVertexArray(vao);
     auto uniform = [&](const char* name) { return glGetUniformLocation(program, name); };
     GLint pos = glGetAttribLocation(program, "aPos"), uv = glGetAttribLocation(program, "aUv");
     glEnableVertexAttribArray(pos); glEnableVertexAttribArray(uv);
@@ -151,9 +155,11 @@ void render(uint64_t surfaceId, const std::string path, const std::vector<uint8_
       glUniform1fv(botLoc, 48, &u.eye_bot[0][0]); glUniform4fv(eyesLoc, 2, u.eyes);
       glUniform4fv(mouthLoc, 1, u.mouth); glUniform4fv(mouthStateLoc, 1, u.mouth_state);
       glUniform4fv(cheeksLoc, 1, u.cheeks); glUniform1f(cheekLoc, u.cheek);
+      meshCache.beginFrame();
       for (size_t i = 0; i < frame.layer_count; ++i) {
         if (stopped) break;
         const auto& layer = frame.layers[i];
+        meshCache.markPresent(layer.name);
         if (!layer.index_count || layer.alpha <= 0 || layer.texture_id >= textures.size()) continue;
         glBindTexture(GL_TEXTURE_2D, textures[layer.texture_id]);
         int face = layer.face ? 1 : layer.eye_ball >= 0 ? 2 + layer.eye_ball : 0;
@@ -162,24 +168,20 @@ void render(uint64_t surfaceId, const std::string path, const std::vector<uint8_
         if (name == "sprites/eyes_half_1.png") face = 5;
         glUniform1i(faceLoc, face); glUniform1f(alphaLoc, layer.alpha);
         glUniform4f(rectLoc, layer.rect[0], layer.rect[1], layer.rect[2], layer.rect[3]);
-        glBindBuffer(GL_ARRAY_BUFFER, buffers[0]);
-        glBufferData(GL_ARRAY_BUFFER, layer.vertex_count * 2 * sizeof(float), layer.positions, GL_STREAM_DRAW);
-        glVertexAttribPointer(pos, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
-        glBindBuffer(GL_ARRAY_BUFFER, buffers[1]);
-        glBufferData(GL_ARRAY_BUFFER, layer.vertex_count * 2 * sizeof(float), layer.uvs, GL_STREAM_DRAW);
-        glVertexAttribPointer(uv, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers[2]);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, layer.index_count * sizeof(uint32_t), layer.indices, GL_STREAM_DRAW);
+        meshCache.bind(layer, pos, uv);
         glDrawElements(GL_TRIANGLES, layer.index_count, GL_UNSIGNED_INT, nullptr);
       }
+      meshCache.endFrame();
       if (stopped) { lock.lock(); break; }
       const GLenum drawError = glGetError();
       if (drawError != GL_NO_ERROR)
         throw std::runtime_error("OpenGL ES 绘制失败，错误码：" + std::to_string(drawError));
       if (!eglSwapBuffers(display, surface)) throw std::runtime_error("原生纹理提交失败，EGL 错误码：" + std::to_string(eglGetError()));
+      // 包含动作计算、上传、绘制和 EGL 提交等待，不包含限帧休眠或 stats 的锁等待。
+      const double frameMs = std::chrono::duration<double, std::milli>(Clock::now() - start).count();
       lock.lock();
       ++frames;
-      renderMs = std::chrono::duration<double, std::milli>(Clock::now() - start).count();
+      renderTotalMs += frameMs;
       changed.wait_until(lock, start + std::chrono::microseconds(33333), [] { return stopped || paused; });
     }
   } catch (const std::exception& exception) {
@@ -188,7 +190,8 @@ void render(uint64_t surfaceId, const std::string path, const std::vector<uint8_
   }
   // 不调用 eglTerminate：默认显示由 Flutter 共享，不能销毁它的显示连接。
   if (context != EGL_NO_CONTEXT && eglGetCurrentContext() == context) {
-    glDeleteTextures(textures.size(), textures.data()); glDeleteBuffers(3, buffers);
+    meshCache.clear();
+    glDeleteTextures(textures.size(), textures.data());
     glDeleteVertexArrays(1, &vao);
     if (program) glDeleteProgram(program);
     if (vertex) glDeleteShader(vertex);
@@ -237,7 +240,7 @@ napi_value load(napi_env env, napi_callback_info info) {
     try {
       dispose();
       std::unique_lock<std::mutex> lock(mutex);
-      stopped = false; ready = false; paused = false; speaking = false; mouthDemo = false; frames = 0; renderMs = 0;
+      stopped = false; ready = false; paused = false; speaking = false; mouthDemo = false; frames = 0; renderTotalMs = 0;
       error.clear(); expression = "neutral";
       renderThread = std::thread(render, job->surfaceId, job->path, std::move(job->bytes));
       changed.wait(lock, [] { return ready; });
@@ -301,7 +304,7 @@ napi_value stats(napi_env env, napi_callback_info) {
   auto number = [&](const char* key, double n) { napi_value v; napi_create_double(env, n, &v); napi_set_named_property(env, result, key, v); };
   auto boolean = [&](const char* key, bool b) { napi_value v; napi_get_boolean(env, b, &v); napi_set_named_property(env, result, key, v); };
   auto text = [&](const char* key, const std::string& s) { napi_value v; napi_create_string_utf8(env, s.c_str(), NAPI_AUTO_LENGTH, &v); napi_set_named_property(env, result, key, v); };
-  number("frames", frames); number("renderMs", renderMs);
+  number("frames", frames); number("renderMs", frames == 0 ? 0.0 : renderTotalMs / static_cast<double>(frames));
   boolean("loaded", avatar != 0 && !stopped); boolean("paused", paused); boolean("speaking", speaking);
   text("expression", expression); text("error", error);
   return result;

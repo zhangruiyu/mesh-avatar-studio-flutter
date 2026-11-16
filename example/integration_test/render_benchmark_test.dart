@@ -9,7 +9,7 @@ import 'package:mesh_avatar_studio/mesh_avatar_studio.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   testWidgets('固定画布和动作的渲染对比采样', (tester) async {
-    // Android / Darwin 的 CLOCKS_PER_SEC 都为 1000000，clock 统计整个进程的 CPU 时间。
+    // Android / Darwin / 鸿蒙的 CLOCKS_PER_SEC 都为 1000000，clock 统计进程 CPU 时间。
     // CPU 百分比以一个核心为 100%，多线程合计可以超过 100%；不代表 GPU 时间。
     final cpuClock = DynamicLibrary.process()
         .lookupFunction<IntPtr Function(), int Function()>('clock');
@@ -52,9 +52,13 @@ void main() {
             'wallMs': wallMs, 'frames': frames, 'fps': frames * 1000 / wallMs,
             'cpuPercent': cpuMs / wallMs * 100, 'peakRssMiB': peakRss / 1048576,
             // 旧链路包含同步 GPU 等待；新链路是提交耗时，需结合 CPU 和实际帧率判断。
-            'nativeCallMs': (end.renderMilliseconds * end.frames -
-                    start.renderMilliseconds * start.frames) /
-                frames,
+            // 旧鸿蒙返回单帧耗时，比较旧版时传 false，不能使用累计平均的差分公式。
+            'nativeCallMs': const bool.fromEnvironment('BENCH_STATS_CUMULATIVE',
+                    defaultValue: true)
+                ? (end.renderMilliseconds * end.frames -
+                        start.renderMilliseconds * start.frames) /
+                    frames
+                : null,
           })}');
     }
   });
