@@ -10,6 +10,9 @@ root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("platform", choices=["apple", "android", "ohos"])
 parser.add_argument("--ndk", type=Path, help="Android NDK 根目录")
+parser.add_argument("--android-abi", nargs="+",
+                    choices=["armeabi-v7a", "arm64-v8a", "x86_64"],
+                    help="只重建指定 Android ABI；不传时重建全部三个架构")
 parser.add_argument("--ohos-native", type=Path, help="DevEco SDK 的 native 目录")
 parser.add_argument("--target-dir", type=Path, default=root / "build/native-target")
 args = parser.parse_args()
@@ -57,8 +60,11 @@ elif args.platform == "android":
     if args.ndk is None: parser.error("android 需要 --ndk")
     compiler_dir = args.ndk.resolve() / "toolchains/llvm/prebuilt/darwin-x86_64/bin"
     for target, clang, abi in [
+        ("armv7-linux-androideabi", "armv7a-linux-androideabi26-clang", "armeabi-v7a"),
         ("aarch64-linux-android", "aarch64-linux-android26-clang", "arm64-v8a"),
         ("x86_64-linux-android", "x86_64-linux-android26-clang", "x86_64")]:
+        if args.android_abi is not None and abi not in args.android_abi:
+            continue
         env = os.environ.copy()
         key = target.upper().replace("-", "_")
         env["CARGO_TARGET_" + key + "_LINKER"] = str(compiler_dir / clang)

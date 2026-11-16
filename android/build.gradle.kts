@@ -17,8 +17,8 @@ configure<com.android.build.gradle.LibraryExtension> {
     ndkVersion = "28.2.13676358"
     defaultConfig {
         minSdk = 26
-        // 发布包提供真机 ARM64 和模拟器 x64；不宣称支持 32 位设备。
-        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+        // 同时提供 32 位 ARM、64 位 ARM 和 x64，宿主按目标设备选择 ABI。
+        ndk { abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64") }
         consumerProguardFiles("consumer-rules.pro")
         externalNativeBuild { cmake { cppFlags += "-std=c++17" } }
     }

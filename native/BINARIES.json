@@ -8,6 +8,11 @@
       "sha256": "4fa2b79af7df4a4179f0454ec12aa5fa8a89bc66f1f7401f9418d1b600607fc3"
     },
     {
+      "path": "android/src/main/jniLibs/armeabi-v7a/libmesh_avatar_ffi.so",
+      "bytes": 7200180,
+      "sha256": "0593e4ae984e2d98399f0dbba6bf226f8451b7f354a5c8be126301a12c4b0b07"
+    },
+    {
       "path": "android/src/main/jniLibs/x86_64/libmesh_avatar_ffi.so",
       "bytes": 9981208,
       "sha256": "da8b9a438a4273cc80373a18e21c343b7115716db75b45a0a97578721c4e9979"

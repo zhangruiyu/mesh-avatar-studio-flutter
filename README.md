@@ -121,12 +121,12 @@ debugPrint('${stats.frames} 帧，平均 ${stats.renderMilliseconds} ms');
 
 | 平台 | 发布的架构 | 原生实现 | 宿主要求 |
 | --- | --- | --- | --- |
-| Android | ARM64、x86_64 | Rust / wgpu Vulkan + SurfaceProducer | API 26+，兼容 Vulkan 的设备 |
+| Android | ARMv7（32 位）、ARM64、x86_64 | Rust / wgpu Vulkan + SurfaceProducer | API 26+，兼容 Vulkan 的设备 |
 | iOS | ARM64 真机，ARM64 / x86_64 模拟器 | Rust / wgpu Metal + CVPixelBuffer | iOS 13+，CocoaPods |
 | macOS | ARM64、x86_64 | Rust / wgpu Metal + CVPixelBuffer | macOS 10.15+，CocoaPods |
 | HarmonyOS | ARM64 | Rust 动作核心 + C++ OpenGL ES 3 + 原生纹理 | Flutter 鸿蒙分支与 DevEco SDK，示例 API 17+ |
 
-不支持 Web、Windows、Linux、32 位 Android。Android 宿主请仅构建 `android-arm64,android-x64`，发布 AAB 时在宿主 `ndk.abiFilters` 中也限定这两个架构。插件使用 Java 17、NDK 28.2 和 CMake 3.22.1。鸿蒙须使用支持 `ohos` 插件的 Flutter 分支；普通 Flutter SDK 可正常用于其他平台。
+不支持 Web、Windows、Linux 和 Android 32 位 x86。Android 支持 `android-arm,android-arm64,android-x64`，对应 `armeabi-v7a,arm64-v8a,x86_64`。宿主如果设置了 `ndk.abiFilters`，需包含希望支持的架构。32 位 ARM 的原生库与 APK 已编译验证，当前未具备可运行 32 位应用的设备；具体机型仍须验证 Vulkan 渲染，不能仅凭 ABI 判断兼容。插件使用 Java 17、NDK 28.2 和 CMake 3.22.1。鸿蒙须使用支持 `ohos` 插件的 Flutter 分支；普通 Flutter SDK 可正常用于其他平台。
 
 当前原生画布固定为 **600 × 800，约 30 帧/秒**。`MeshAvatarView.fit` 控制这张纹理在组件中的缩放，默认 `BoxFit.contain`；不能恢复原生画布已裁掉的内容。Apple 和 Android 仍有 GPU 像素回读与拷贝，内存和耗时需结合实际机型验收，暂不作为多角色或高帧率方案。
 

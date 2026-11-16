@@ -9,3 +9,5 @@
 发布前执行 `python3 tool/check_binaries.py --write` 更新校验清单，再运行不带 `--write` 的命令核对。改变上游或 Cargo.lock 后，还要重新整理第三方许可证并执行各平台集成测试；仅更新二进制校验不代表通过验收。
 
 Apple / Android 启用 `mesh-avatar-ffi/render`，鸿蒙只构建 CPU 动作核心，由插件内的 C++ OpenGL ES 渲染器绘制。所有调用来自原生桥接，不运行 WebView。
+
+Android 默认构建全部三个 ABI。只补编译 32 位 ARM 时可使用 `python3 tool/build_native.py android --android-abi armeabi-v7a --ndk /Android/NDK/路径`，避免重建已验证的其他架构。

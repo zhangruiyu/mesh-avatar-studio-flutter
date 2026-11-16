@@ -18,4 +18,17 @@ dart pub publish --dry-run
 
 预检只检查，不会上传。实际发布由包维护者在确认账号、版本和内容后执行 `dart pub publish`；发布后的版本不能覆盖。
 
-Apple 首版采用 CocoaPods，当前尚未提供 Swift Package Manager 清单。Android 仅发布 ARM64 和 x64，宿主不要加入 32 位 ABI。鸿蒙需要支持 ohos 插件的平台分支和个人调试签名。
+Apple 首版采用 CocoaPods，当前尚未提供 Swift Package Manager 清单。Android 发布 ARMv7、ARM64 和 x64，分别对应 `armeabi-v7a`、`arm64-v8a`、`x86_64`。32 位 ARM 支持不代表所有旧设备的 GPU 都满足 Vulkan 要求。鸿蒙需要支持 ohos 插件的平台分支和个人调试签名。
+
+Android 发布前在 `example` 中构建分架构 APK，并从包根目录核对实际库：
+
+```sh
+# 在 example 中执行
+flutter build apk --release --split-per-abi --target-platform android-arm,android-arm64,android-x64
+# 回到插件根目录执行
+python3 tool/check_android_apk.py example/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk --abis armeabi-v7a
+python3 tool/check_android_apk.py example/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk --abis arm64-v8a
+python3 tool/check_android_apk.py example/build/app/outputs/flutter-apk/app-x86_64-release.apk --abis x86_64
+```
+
+脚本检查 APK 是否包含正确架构的 Flutter 引擎、Rust 运行库及 JNI 桥接，并检查插件库的 16 KiB 对齐。真机运行测试的覆盖范围仍单独记录在 `VERIFICATION.md`。
