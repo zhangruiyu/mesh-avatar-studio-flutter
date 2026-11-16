@@ -13,10 +13,11 @@ default = []
 render = ["dep:mesh-avatar-wgpu", "dep:pollster"]
 
 [dependencies]
+serde.workspace = true
+serde_json.workspace = true
 mesh-avatar-core.workspace = true
 mesh-avatar-wgpu = { workspace = true, optional = true }
 pollster = { workspace = true, optional = true }
 
 [dev-dependencies]
 zip.workspace = true
-serde_json.workspace = true

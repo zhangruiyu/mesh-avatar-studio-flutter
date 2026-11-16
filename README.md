@@ -4,7 +4,7 @@ Flutter 原生 2D 网格角色播放器，Dart 包名为 `mesh_avatar_studio`。
 
 这是基于上游开源运行库开发的独立 Flutter 插件，并非上游官方插件。它读取 Mesh Avatar Studio 的 `.mavatar` ZIP 或导出目录，**不能直接读取 Live2D Cubism 的 `.moc3` / `.model3.json`**。
 
-当前为 `0.1.0-dev.1` 预览版。插件不会自动下载模型、播放声音或申请录音权限。`example` 已内置官方 Miko 示例角色，运行即可体验；普通应用依赖插件不会自动打包该示例资源。
+当前为 `0.1.0-dev.2` 预览版。插件不会自动下载模型、播放声音或申请录音权限。`example` 已内置官方 Miko 示例角色，运行即可体验；普通应用依赖插件不会自动打包该示例资源。
 
 ## 安装
 
@@ -12,7 +12,7 @@ Flutter 原生 2D 网格角色播放器，Dart 包名为 `mesh_avatar_studio`。
 
 ```yaml
 dependencies:
-  mesh_avatar_studio: ^0.1.0-dev.1
+  mesh_avatar_studio: ^0.1.0-dev.2
 ```
 
 尚未发布时，可通过本地目录依赖接入：
@@ -113,9 +113,57 @@ final stats = await controller.getStats();
 debugPrint('${stats.frames} 帧，平均 ${stats.renderMilliseconds} ms');
 ```
 
-支持表情：`neutral`、`smile`、`shy`、`surprise`、`halfLidded`、`angry`、`sad`、`wink`。支持动作：`nod`、`no`、`sway`、`greet`。具体视觉效果取决于角色导出时的图层和绑定。
+支持表情：`neutral`、`smile`、`shy`、`surprise`、`halfLidded`、`angry`、`sad`、`wink`。支持全部 21 个动作：`nod`、`no`、`sway`、`greet`、`tilt`、`think`、`giggle`、`surprise`、`shy`、`wink`、`lookAround`、`glance`、`sigh`、`doze`、`stretch`、`lean`、`hum`、`tap`、`readNote`、`waiting`、`spaceOut`。具体视觉效果取决于角色导出时的图层和绑定。
 
 默认移动端进入后台暂停绘制，回来后继续；用户主动暂停不会被前台恢复覆盖。macOS 窗口失焦仍可绘制。可通过 `MeshAvatarController(pauseWhenBackground: false)` 关闭自动暂停。统计中的耗时包含原生绘制和提交，不是纯 GPU 时间，也不等于 Flutter 页面 FPS。
+
+## 完整运行控制
+
+本插件只做播放器和运行控制，**不提供角色制作、图层编辑、绑定编辑或模型保存功能**。调节仅作用于当前加载实例，重新加载恢复模型默认值。
+
+```dart
+final metadata = await controller.getMetadata();
+await controller.playMotionById('lookAround');
+await controller.setEmotion(MeshAvatarEmotion.happy, playMotion: true);
+
+// 整批替换手动覆盖值；下一次只传 angleX，旧 gazeX 覆盖就会取消。
+await controller.setParameters({'angleX': 12, 'gazeX': 0.4}, weight: 0.8);
+await controller.clearParameters(); // 恢复自动控制
+await controller.setAutoIdle(true);
+await controller.setAutoMotion(true);
+await controller.setTalkGain(1.2);
+await controller.setSwayGain(0.8);
+
+await controller.setLipSync(const MeshAvatarLipSyncSettings(
+  granularity: 0.5, openness: 0.7, closeSpeed: 0.6,
+));
+await controller.holdMouth(MeshAvatarVowel.a);
+await controller.speakKana('こんにちは', speed: 7, loop: false);
+await controller.stopLipSync();
+
+await controller.setOverlays(metadata.overlays); // 显示全部已配置配饰
+await controller.setOverlays([]);
+if (metadata.garments.isNotEmpty) {
+  await controller.setClothTuning({'follow': 0.8, 'damping': 1.2},
+      name: metadata.garments.first);
+}
+final state = await controller.getState();
+debugPrint('当前动作：${state.motion}，手动参数：${state.overrides}');
+final subscription = controller.motionEvents.listen((event) {
+  debugPrint(event.id == null ? '动作结束' : '动作开始：${event.id}');
+}, onError: (Object error) { debugPrint('$error'); });
+// 页面结束时取消订阅，再释放控制器。
+await subscription.cancel();
+```
+
+- 情绪 `neutral / happy / sad / angry / surprised / relaxed` 与 8 种素材表情独立，可搭配使用。`emotionExpression` 返回底层混合表情名，如 `happyTalk`。
+- 25 个参数及范围由 `metadata.parameters` 返回，覆盖头部、身体、眼睛、视线、眉毛、口型、脸红、手部、双臂与重心。模型未绑定的参数可能没有可见效果。非法参数整批拒绝，不会部分生效；手动覆盖持续到替换或清空。
+- 元音、假名和音量/演示口型互斥切换。假名接口只驱动嘴形，不发声，不合成语音，也不将中文转换为假名；速度为每秒 4..12 拍。口型设置均为 0..1，省略字段保留原值。手动 `mouthOpen/mouthForm` 覆盖仍优先，必要时先 `clearParameters()`。
+- `setAutoIdle` 控制自动呼吸、眨眼和视线；`setAutoMotion` 控制自动选动作，不中断已开始动作。说话和摆动幅度必须为非负有限数，默认 1，0 关闭。
+- `setOverlays` 替换显示名单，未知名字按上游规则忽略。**官方随包 Miko 没有独立 overlays 和 cloth 部件**，示例显示说明；换成具有这些部件的模型后自动出现控件。
+- 衣物调节是局部更新，省略 `name` 调节全部衣物。`responseGain / tierGain / highModeDamping / swing / stiffness / damping / max` 必须为正有限数；`follow` 为 0..1；`cohesion` 为 0..8 整数；`wind` 为非负有限数。未知衣物名、字段或非法值整批拒绝。`state.clothTuning` 可查询实际参数。
+- `getState()` 返回最近一帧参数、覆盖值、动作、口型、配饰和设置；设置后需等下一帧才能在 `parameters` 看到变化。原有 `getStats()` 保留。
+- `motionEvents` 包含手动和自动动作；有订阅时每 100ms 读取，不订阅不轮询。原生最多保留最近 256 次变化，`getState()` 也会取出并分发事件；未订阅时事件不重播，长时间未读取可能丢弃更旧事件。暂停不产生新帧事件，重载清空旧队列。
 
 ## 平台范围
 
@@ -132,7 +180,7 @@ debugPrint('${stats.frames} 帧，平均 ${stats.renderMilliseconds} ms');
 
 ## 示例与验证
 
-`example` 是只依赖插件公开接口的完整 Flutter 工程，默认通过 `loadAsset` 加载随包的官方旗袍角色 Miko，无需网络或手动导入。可输入本地路径切换自定义角色，清空路径后点击“加载角色”回到 Miko。
+`example` 是只依赖插件公开接口的完整 Flutter 工程，默认通过 `loadAsset` 加载随包的官方旗袍角色 Miko，无需网络或手动导入。上方显示角色，下方提供完整运行控制面板；滑块松手时应用，手动参数可恢复自动。可输入本地路径切换自定义角色，清空路径后点击“加载角色”回到 Miko。
 
 在 `example` 目录运行：
 

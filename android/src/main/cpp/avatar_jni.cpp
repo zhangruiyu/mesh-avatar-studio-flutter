@@ -124,6 +124,7 @@ Java_dev_meshavatar_mesh_1avatar_1studio_MeshAvatarStudioPlugin_nativeCommand(JN
     else if (name == "motion") check(mesh_avatar_play(avatar.model, argument.c_str()));
     else if (name == "voiceLevel") check(mesh_avatar_set_voice_level(avatar.model, std::stod(argument)));
     else if (name == "speaking" || name == "mouthDemo") {
+      if (argument == "true") check(mesh_avatar_stop_lip_sync(avatar.model));
       avatar.mouthDemo = name == "mouthDemo" && argument == "true";
       avatar.speaking = argument == "true";
       check(mesh_avatar_set_speaking(avatar.model, avatar.speaking ? 1 : 0));
@@ -146,4 +147,23 @@ Java_dev_meshavatar_mesh_1avatar_1studio_MeshAvatarStudioPlugin_nativeStats(JNIE
 extern "C" JNIEXPORT void JNICALL
 Java_dev_meshavatar_mesh_1avatar_1studio_MeshAvatarStudioPlugin_nativeDestroy(JNIEnv*, jobject, jlong handle) {
   delete reinterpret_cast<Avatar*>(handle);
+}
+
+// 字符串在此复制回 JVM，不能把 Rust 分配的内存留给 Java 释放。
+extern "C" JNIEXPORT jstring JNICALL
+Java_dev_meshavatar_mesh_1avatar_1studio_MeshAvatarStudioPlugin_nativeControl(JNIEnv* env, jobject, jlong handle, jstring request) {
+  try {
+    const auto input = stringValue(env, request);
+    char* output = nullptr;
+    check(mesh_avatar_control_json(get(handle).model, input.c_str(), &output));
+    // JSON 的非 ASCII 文本由 Dart 按 Unicode 转义传入，输出转为 UTF-16，避免 JNI Modified UTF-8 限制。
+    jbyteArray bytes = env->NewByteArray(static_cast<jsize>(std::strlen(output)));
+    if (!bytes) { mesh_avatar_free_string(output); return nullptr; }
+    env->SetByteArrayRegion(bytes, 0, static_cast<jsize>(std::strlen(output)), reinterpret_cast<const jbyte*>(output));
+    mesh_avatar_free_string(output);
+    auto cls = env->FindClass("java/lang/String");
+    auto constructor = env->GetMethodID(cls, "<init>", "([BLjava/lang/String;)V");
+    auto encoding = env->NewStringUTF("UTF-8");
+    return static_cast<jstring>(env->NewObject(cls, constructor, bytes, encoding));
+  } catch (const std::exception& error) { report(env, error); return nullptr; }
 }

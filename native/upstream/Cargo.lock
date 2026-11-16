@@ -1069,6 +1069,7 @@ dependencies = [
  "mesh-avatar-core",
  "mesh-avatar-wgpu",
  "pollster",
+ "serde",
  "serde_json",
  "zip",
 ]

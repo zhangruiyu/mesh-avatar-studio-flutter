@@ -1,6 +1,6 @@
 name: mesh_avatar_studio
 description: Flutter 原生 2D 网格角色播放器，支持 Mesh Avatar Studio 模型、表情、动作和音量驱动口型，适用于 Android、iOS、macOS 与鸿蒙。
-version: 0.1.0-dev.1
+version: 0.1.0-dev.2
 repository: https://github.com/zhangruiyu/mesh-avatar-studio-flutter
 issue_tracker: https://github.com/zhangruiyu/mesh-avatar-studio-flutter/issues
 

@@ -92,6 +92,8 @@ impl CachedFrame {
 }
 pub(crate) struct Entry {
     pub avatar: Avatar,
+    // 有界队列：宿主长时间不订阅时最多保留最近 256 次动作变化。
+    pub events: std::collections::VecDeque<Option<String>>,
     pub frame: Option<CachedFrame>,
     pub poisoned: bool,
     alive: bool,
@@ -114,6 +116,7 @@ impl Entry {
             .collect();
         let mut entry = Self {
             avatar,
+            events: Default::default(),
             frame: None,
             poisoned: false,
             alive: true,
@@ -126,6 +129,10 @@ impl Entry {
     pub fn tick(&mut self, dt: f64) -> Result<()> {
         self.frame = None; // Invalidate borrowed frame pointers before changing core state.
         let frame = self.avatar.tick(dt);
+        self.events.extend(frame.motion_events.iter().cloned());
+        while self.events.len() > 256 {
+            self.events.pop_front();
+        }
         self.frame = Some(CachedFrame::new(frame, &self.ids)?);
         Ok(())
     }

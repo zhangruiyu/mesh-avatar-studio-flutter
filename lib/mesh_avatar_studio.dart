@@ -2,6 +2,7 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -19,7 +20,170 @@ enum MeshAvatarExpression {
 }
 
 /// 上游运行库支持的内置动作。
-enum MeshAvatarMotion { nod, no, sway, greet }
+enum MeshAvatarMotion {
+  nod,
+  no,
+  sway,
+  greet,
+  tilt,
+  think,
+  giggle,
+  surprise,
+  shy,
+  wink,
+  lookAround,
+  glance,
+  sigh,
+  doze,
+  stretch,
+  lean,
+  hum,
+  tap,
+  readNote,
+  waiting,
+  spaceOut
+}
+
+/// 情绪驱动与素材表情独立，可同时使用。
+enum MeshAvatarEmotion { neutral, happy, sad, angry, surprised, relaxed }
+
+/// 固定元音；n 表示闭口。
+enum MeshAvatarVowel { a, i, u, e, o, n }
+
+/// 当前运行库可播放的动作信息，时长单位为秒。
+@immutable
+class MeshAvatarMotionInfo {
+  const MeshAvatarMotionInfo(
+      {required this.id,
+      required this.label,
+      required this.duration,
+      required this.idle});
+  final String id;
+  final String label;
+  final double duration;
+  final bool idle;
+}
+
+/// 原生参数的取值范围，使用 id 传给 setParameters。
+@immutable
+class MeshAvatarParameter {
+  const MeshAvatarParameter(
+      {required this.id,
+      required this.label,
+      required this.min,
+      required this.max,
+      required this.defaultValue,
+      required this.group});
+  final String id;
+  final String label;
+  final double min;
+  final double max;
+  final double defaultValue;
+  final String group;
+}
+
+/// 运行库能力及当前模型实际拥有的配饰、衣物。
+@immutable
+class MeshAvatarMetadata {
+  MeshAvatarMetadata._(Map<String, dynamic> data)
+      : motions = List.unmodifiable((data['motions'] as List).map((m) =>
+            MeshAvatarMotionInfo(
+                id: m['id'],
+                label: m['label'],
+                duration: (m['duration'] as num).toDouble(),
+                idle: m['idle']))),
+        parameters = List.unmodifiable((data['parameters'] as List).map((p) =>
+            MeshAvatarParameter(
+                id: p['id'],
+                label: p['label'],
+                min: (p['min'] as num).toDouble(),
+                max: (p['max'] as num).toDouble(),
+                defaultValue: (p['def'] as num).toDouble(),
+                group: p['group']))),
+        overlays = List<String>.unmodifiable(data['overlays'] as List),
+        garments = List<String>.unmodifiable(data['garments'] as List);
+  final List<MeshAvatarMotionInfo> motions;
+  final List<MeshAvatarParameter> parameters;
+  final List<String> overlays;
+  final List<String> garments;
+}
+
+/// 口型灵敏度、张口幅度及闭口速度，均为 0..1；省略字段保持原值。
+@immutable
+class MeshAvatarLipSyncSettings {
+  const MeshAvatarLipSyncSettings(
+      {this.granularity, this.openness, this.closeSpeed});
+  final double? granularity;
+  final double? openness;
+  final double? closeSpeed;
+  Map<String, double> _values() => {
+        if (granularity != null) 'granularity': granularity!,
+        if (openness != null) 'openness': openness!,
+        if (closeSpeed != null) 'closeSpeed': closeSpeed!,
+      };
+}
+
+/// 当前原生运行状态；parameters 是最近一帧结果，overrides 是手动覆盖值。
+@immutable
+class MeshAvatarState {
+  MeshAvatarState._(Map<String, dynamic> data)
+      : parameters = Map.unmodifiable((data['parameters'] as Map)
+            .map((k, v) => MapEntry(k as String, (v as num?)?.toDouble()))),
+        overrides = Map.unmodifiable((data['overrides'] as Map)
+            .map((k, v) => MapEntry(k as String, (v as num).toDouble()))),
+        clothTuning = Map.unmodifiable((data['clothTuning'] as Map).map(
+            (k, v) => MapEntry(
+                k as String,
+                Map<String, double>.unmodifiable((v as Map).map(
+                    (k, v) => MapEntry(k as String, (v as num).toDouble())))))),
+        weight = (data['weight'] as num).toDouble(),
+        motion = data['motion'] as String?,
+        expression = data['expression'] as String,
+        emotionExpression = data['emotion'] as String,
+        expressionActive = data['expressionActive'] as bool,
+        autoIdle = data['autoIdle'] as bool,
+        autoMotion = data['autoMotion'] as bool,
+        talkGain = (data['talkGain'] as num).toDouble(),
+        swayGain = (data['swayGain'] as num).toDouble(),
+        speaking = data['speaking'] as bool,
+        lipSync = MeshAvatarLipSyncSettings(
+            granularity: (data['lipSync']['granularity'] as num).toDouble(),
+            openness: (data['lipSync']['openness'] as num).toDouble(),
+            closeSpeed: (data['lipSync']['closeSpeed'] as num).toDouble()),
+        lipSyncActive = data['mouth']['active'] as bool,
+        mouthOpen = (data['mouth']['open'] as num).toDouble(),
+        mouthForm = (data['mouth']['form'] as num).toDouble(),
+        overlays = List<String>.unmodifiable(data['overlays'] as List);
+  final Map<String, double?> parameters;
+  final Map<String, double> overrides;
+
+  /// 每件衣物当前使用的物理参数。
+  final Map<String, Map<String, double>> clothTuning;
+  final double weight;
+  final String? motion;
+  final String expression;
+
+  /// 底层情绪混合名，如 happyTalk；它不是素材表情名。
+  final String emotionExpression;
+  final bool expressionActive;
+  final bool autoIdle;
+  final bool autoMotion;
+  final double talkGain;
+  final double swayGain;
+  final bool speaking;
+  final MeshAvatarLipSyncSettings lipSync;
+  final bool lipSyncActive;
+  final double mouthOpen;
+  final double mouthForm;
+  final List<String> overlays;
+}
+
+/// 原生动作变化通知；id 为 null 表示动作结束，包含自动动作。
+@immutable
+class MeshAvatarMotionEvent {
+  const MeshAvatarMotionEvent(this.id);
+  final String? id;
+}
 
 /// 原生绘制状态；renderMilliseconds 包含绘制与提交，并非纯 GPU 时间。
 @immutable
@@ -63,6 +227,34 @@ class MeshAvatarController extends ChangeNotifier with WidgetsBindingObserver {
   static MeshAvatarController? _active;
   Future<void> _pending = Future<void>.value();
   bool _disposed = false;
+  Timer? _motionTimer;
+  bool _pollingMotion = false;
+  late final StreamController<MeshAvatarMotionEvent> _motionEvents =
+      StreamController<MeshAvatarMotionEvent>.broadcast(
+    onListen: () {
+      _motionTimer =
+          Timer.periodic(const Duration(milliseconds: 100), (_) async {
+        // 上一次查询未完成时不继续排队，避免慢设备无限积压。
+        if (_pollingMotion || _disposed || !isLoaded || isLoading) return;
+        _pollingMotion = true;
+        try {
+          await getState();
+        } catch (e, stack) {
+          if (!_disposed) _motionEvents.addError(e, stack);
+        } finally {
+          _pollingMotion = false;
+        }
+      });
+    },
+    onCancel: () {
+      _motionTimer?.cancel();
+      _motionTimer = null;
+    },
+  );
+
+  /// 有订阅者时每 100ms 读取原生事件；最近最多保留 256 次变化。
+  /// 暂停时不产生新帧事件，重新加载会开始新的事件队列。
+  Stream<MeshAvatarMotionEvent> get motionEvents => _motionEvents.stream;
   bool _pausedByUser = false;
   bool _loading = false;
   int? _textureId;
@@ -209,6 +401,143 @@ class MeshAvatarController extends ChangeNotifier with WidgetsBindingObserver {
     });
   }
 
+  // 仅内部传输使用 JSON；先序列化冻结请求，避免调用者在排队期间修改 Map/List。
+  Future<dynamic> _control(Map<String, Object?> request,
+      {bool stopVoice = false}) {
+    _checkOpen();
+    // JNI 的输入字符串采用 ASCII JSON，完整保留代理对与所有 Unicode 文本。
+    final encoded = jsonEncode(request).replaceAllMapped(
+        RegExp(r'[^\x00-\x7F]'),
+        (m) => m[0]!
+            .codeUnits
+            .map((u) => '\\u${u.toRadixString(16).padLeft(4, '0')}')
+            .join());
+    if (encoded.length > 65536) throw ArgumentError('控制请求不能超过 64 KiB');
+    return _enqueue(() async {
+      _checkOpen();
+      if (_active != this || !isLoaded) throw StateError('请先加载角色');
+      try {
+        if (stopVoice) {
+          await _channel.invokeMethod<void>('mouthDemo', {'enabled': false});
+        }
+        final result = await _channel
+            .invokeMethod<String>('control', {'request': encoded});
+        final data = jsonDecode(result!);
+        if (request['method'] == 'state' && !_disposed) {
+          for (final id in data['motionEvents'] as List) {
+            _motionEvents.add(MeshAvatarMotionEvent(id as String?));
+          }
+        }
+        return data;
+      } catch (e) {
+        _lastError = e;
+        _changed();
+        rethrow;
+      }
+    });
+  }
+
+  /// 查询动作、参数范围以及此模型实际配置的配饰和衣物。
+  Future<MeshAvatarMetadata> getMetadata() async => MeshAvatarMetadata._(
+      await _control({'method': 'metadata'}) as Map<String, dynamic>);
+
+  /// 查询原生状态，同时把积压的动作变化发送到 motionEvents。
+  Future<MeshAvatarState> getState() async => MeshAvatarState._(
+      await _control({'method': 'state'}) as Map<String, dynamic>);
+
+  /// 按原生动作 ID 播放，未知 ID 会返回平台错误。
+  Future<void> playMotionById(String id) =>
+      _control({'method': 'motion', 'name': id});
+
+  /// 切换情绪，可选择不触发该情绪的默认动作。
+  Future<void> setEmotion(MeshAvatarEmotion emotion,
+          {bool playMotion = true}) =>
+      _control({
+        'method': 'emotion',
+        'name': emotion.name,
+        'playMotion': playMotion
+      });
+
+  /// 替换整批手动参数，不是增量合并。范围从 getMetadata 查询；weight 为 0..1。
+  /// 头部 angleX/Y/Z、眼神 gazeX/Y 和口型 mouthOpen/mouthForm 均走此接口。
+  Future<void> setParameters(Map<String, double> values, {double weight = 1}) {
+    _range(weight, 'weight', 0, 1);
+    for (final value in values.values) {
+      if (!value.isFinite) throw ArgumentError('参数必须为有限数');
+    }
+    return _control(
+        {'method': 'parameters', 'values': values, 'weight': weight});
+  }
+
+  /// 取消全部手动参数，交还给自动动作、呼吸和眨眼。
+  Future<void> clearParameters() => setParameters({});
+
+  /// 显示列表中的配饰；空列表隐藏全部，模型没有的名字按上游规则忽略。
+  Future<void> setOverlays(List<String> names) =>
+      _control({'method': 'overlays', 'names': names});
+
+  /// 修改口型运行参数，未传的字段保持原值。
+  Future<void> setLipSync(MeshAvatarLipSyncSettings settings) {
+    final values = settings._values();
+    for (final e in values.entries) {
+      _range(e.value, e.key, 0, 1);
+    }
+    return _control({'method': 'lipSync', 'settings': values});
+  }
+
+  /// 无声音的假名口型序列。此接口不合成语音，也不把中文转为假名。
+  /// speed 为每秒 4..12 拍，省略使用上游默认；自动退出音量/演示驱动。
+  Future<void> speakKana(String text, {double? speed, bool loop = false}) {
+    if (speed != null) _range(speed, 'speed', 4, 12);
+    return _control(
+        {'method': 'speakKana', 'text': text, 'speed': speed, 'loop': loop},
+        stopVoice: true);
+  }
+
+  /// 固定元音口型，自动退出音量/演示驱动。
+  Future<void> holdMouth(MeshAvatarVowel vowel) =>
+      _control({'method': 'holdMouth', 'vowel': vowel.name}, stopVoice: true);
+
+  /// 停止假名或固定元音；同时退出演示和音量驱动。
+  Future<void> stopLipSync() =>
+      _control({'method': 'stopLipSync'}, stopVoice: true);
+
+  /// 自动呼吸、眨眼和视线等待机运动。
+  Future<void> setAutoIdle(bool enabled) =>
+      _control({'method': 'autoIdle', 'enabled': enabled});
+
+  /// 是否自动挑选内置动作，不中断当前已播放的动作。
+  Future<void> setAutoMotion(bool enabled) =>
+      _control({'method': 'autoMotion', 'enabled': enabled});
+
+  /// 说话带动身体的幅度，0 为关闭，默认 1；必须为非负有限数。
+  Future<void> setTalkGain(double gain) {
+    _range(gain, 'gain', 0, double.maxFinite);
+    return _control({'method': 'talkGain', 'gain': gain});
+  }
+
+  /// 头发、配饰和衣物的物理摆动幅度，0 为关闭，默认 1。
+  Future<void> setSwayGain(double gain) {
+    _range(gain, 'gain', 0, double.maxFinite);
+    return _control({'method': 'swayGain', 'gain': gain});
+  }
+
+  /// 局部更新衣物物理参数；name 省略表示全部衣物，不修改模型文件。
+  /// 支持 responseGain、tierGain、highModeDamping、swing、stiffness、damping、
+  /// follow、cohesion、wind、max。原生校验字段和范围，非法整批不生效。
+  Future<void> setClothTuning(Map<String, double> values, {String? name}) {
+    for (final value in values.values) {
+      if (!value.isFinite) throw ArgumentError('衣物参数必须为有限数');
+    }
+    return _control({'method': 'cloth', 'name': name, 'values': values});
+  }
+
+  static void _range(double value, String name, double min, double max) {
+    if (!value.isFinite || value < min || value > max) {
+      throw ArgumentError.value(value, name, '需要 $min 到 $max 的有限数');
+    }
+  }
+
   /// 切换表情。
   Future<void> setExpression(MeshAvatarExpression expression) =>
       _command('expression', {'name': expression.name});
@@ -295,6 +624,8 @@ class MeshAvatarController extends ChangeNotifier with WidgetsBindingObserver {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    _motionTimer?.cancel();
+    unawaited(_motionEvents.close());
     WidgetsBinding.instance.removeObserver(this);
     unawaited(close().catchError((Object e) {
       _lastError = e;

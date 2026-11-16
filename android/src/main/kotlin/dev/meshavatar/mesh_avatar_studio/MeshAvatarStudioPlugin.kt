@@ -30,6 +30,7 @@ class MeshAvatarStudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     private external fun nativeCreate(path: String, bytes: ByteArray?): Long
     private external fun nativeSurface(handle: Long, surface: Surface?)
     private external fun nativeRender(handle: Long, dt: Double): Boolean
+    private external fun nativeControl(handle: Long, request: String): String
     private external fun nativeCommand(handle: Long, method: String, value: String)
     private external fun nativeStats(handle: Long): DoubleArray
     private external fun nativeDestroy(handle: Long)
@@ -126,6 +127,11 @@ class MeshAvatarStudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                     return@post
                 }
                 check(handle != 0L) { "角色尚未加载" }
+                if (call.method == "control") {
+                    val value = nativeControl(handle, call.argument<String>("request") ?: "")
+                    main.post { result.success(value) }
+                    return@post
+                }
                 when (call.method) {
                     "expression" -> {
                         val name = call.argument<String>("name") ?: "neutral"

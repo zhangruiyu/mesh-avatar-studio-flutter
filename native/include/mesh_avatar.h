@@ -320,6 +320,10 @@ MaStatus mesh_avatar_set_auto_idle(MaHandle handle, uint8_t on);
  */
 MaStatus mesh_avatar_set_auto_motion(MaHandle handle, uint8_t on);
 
+/* 运行控制扩展：输出 JSON 由调用方释放；失败输出为 NULL。 */
+MaStatus mesh_avatar_control_json(MaHandle handle, const char *request, char **out);
+void mesh_avatar_free_string(char *text);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

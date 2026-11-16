@@ -11,3 +11,5 @@ export const load: (surfaceId: string, path: string, bytes: ArrayBuffer) => Prom
 export const dispose: () => void;
 export const command: (method: string, value: string) => void;
 export const stats: () => AvatarStats;
+
+export const control: (request: string) => string;

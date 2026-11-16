@@ -1,6 +1,8 @@
 //! A C ABI over the CPU runtime. The checked-in header defines the ownership contract.
 #![deny(unsafe_op_in_unsafe_fn)]
 mod boundary;
+mod controls;
+pub use controls::*;
 #[cfg(feature = "render")]
 pub mod render;
 mod state;

@@ -137,11 +137,20 @@ public final class MeshAvatarStudioPlugin: NSObject, FlutterPlugin, FlutterTextu
         default:
           guard self.avatar != 0 else { throw NSError(domain: "MeshAvatar", code: 3, userInfo: [NSLocalizedDescriptionKey: "角色尚未加载"]) }
           switch call.method {
+          case "control":
+            let request = arguments["request"] as? String ?? ""
+            var output: UnsafeMutablePointer<CChar>?
+            try self.check(request.withCString { mesh_avatar_control_json(self.avatar, $0, &output) })
+            defer { mesh_avatar_free_string(output) }
+            let value = String(cString: output!)
+            DispatchQueue.main.async { result(value) }
+            return
           case "expression":
             let name = arguments["name"] as? String ?? "neutral"
             try self.check(name.withCString { mesh_avatar_set_expression(self.avatar, $0) })
             self.expression = name
           case "speaking", "mouthDemo":
+            if arguments["enabled"] as? Bool == true { try self.check(mesh_avatar_stop_lip_sync(self.avatar)) }
             self.mouthDemo = call.method == "mouthDemo" && (arguments["enabled"] as? Bool ?? false)
             self.speaking = arguments["enabled"] as? Bool ?? false
             try self.check(mesh_avatar_set_speaking(self.avatar, self.speaking ? 1 : 0))

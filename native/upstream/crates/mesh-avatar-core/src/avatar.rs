@@ -316,6 +316,20 @@ impl Avatar {
             hand,
         })
     }
+    /// 运行时快照用于宿主查询，不修改或导出制作数据。
+    pub fn control_state(&self) -> serde_json::Value {
+        serde_json::json!({
+            "parameters": self.last_parameters, "overrides": self.overrides,
+            "weight": self.parameter_weight, "emotion": self.motion.expr,
+            "expression": self.expression.name, "expressionActive": self.expression.active(),
+            "motion": self.motion.play.as_ref().map(|p| &p.id),
+            "autoIdle": self.motion.auto_idle, "autoMotion": self.motion.auto_motion,
+            "talkGain": self.motion.talk_gain, "swayGain": self.physics.gain,
+            "lipSync": self.motion.lip_sync, "mouth": self.lip_sync_state(),
+            "speaking": self.motion.speaking, "clothTuning": self.cloth.tuning(),
+            "overlays": self.overlays.items.iter().filter(|o| o.visible).map(|o| &o.name).collect::<Vec<_>>()
+        })
+    }
     pub fn motions(&self) -> &'static [MotionDefinition] {
         motions()
     }

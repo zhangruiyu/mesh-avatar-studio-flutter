@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -17,6 +18,7 @@ void main() {
   late MeshAvatarController controller;
   Future<Object?> reply(MethodCall call) async {
     calls.add(call);
+    if (call.method == 'control') return 'null';
     if (call.method == 'load') return {'textureId': 42};
     if (call.method == 'stats') {
       return {
@@ -140,5 +142,34 @@ void main() {
     await controller.getStats();
     final pauses = calls.where((c) => c.method == 'pause').toList();
     expect(pauses.last.arguments['paused'], true);
+  });
+  test('高级控制冻结输入并无损传递 Unicode', () async {
+    await controller.loadFile('/model.mavatar');
+    calls.clear();
+    final values = {'angleX': 12.0};
+    final queued = controller.setParameters(values, weight: 0.5);
+    values['angleX'] = 99;
+    await queued;
+    final request = jsonDecode(calls.last.arguments['request'] as String);
+    expect(request['values']['angleX'], 12);
+    expect(request['weight'], 0.5);
+    await controller.speakKana('こんにちは😊', speed: 8, loop: true);
+    expect(jsonDecode(calls.last.arguments['request'] as String)['text'],
+        'こんにちは😊');
+    expect(calls[calls.length - 2].method, 'mouthDemo');
+    expect(calls[calls.length - 2].arguments['enabled'], false);
+  });
+  test('非法高级参数不进入原生队列', () {
+    expect(() => controller.setParameters({'angleX': double.nan}),
+        throwsArgumentError);
+    expect(() => controller.setParameters({}, weight: 2), throwsArgumentError);
+    expect(
+        () => controller
+            .setLipSync(const MeshAvatarLipSyncSettings(openness: -1)),
+        throwsArgumentError);
+    expect(() => controller.speakKana('あ', speed: 0), throwsArgumentError);
+    expect(() => controller.setTalkGain(double.infinity), throwsArgumentError);
+    expect(() => controller.setSwayGain(-1), throwsArgumentError);
+    expect(calls, isEmpty);
   });
 }

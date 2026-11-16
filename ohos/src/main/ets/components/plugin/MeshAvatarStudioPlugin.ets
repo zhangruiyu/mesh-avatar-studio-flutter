@@ -76,6 +76,8 @@ export default class MeshAvatarStudioPlugin implements FlutterPlugin, MethodCall
             result.success(data);
             break;
           }
+          case 'control':
+            result.success(nativeAvatar.control(call.argument('request') as string)); break;
           case 'expression':
           case 'motion':
             nativeAvatar.command(call.method, call.argument('name') as string);

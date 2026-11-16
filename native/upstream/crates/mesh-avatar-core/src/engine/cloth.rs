@@ -243,6 +243,13 @@ impl ClothPhysics {
             time: 0.0,
         })
     }
+    /// 返回运行中的实际参数，供宿主同步控制面板；不会写回 rig。
+    pub fn tuning(&self) -> std::collections::BTreeMap<String, ClothTuning> {
+        self.garments
+            .iter()
+            .map(|g| (g.name.clone(), g.tuning.clone()))
+            .collect()
+    }
     pub fn set_tuning(&mut self, name: Option<&str>, update: &ClothTuningUpdate) -> Result<()> {
         ClothTuning::default().updated(update).validate()?;
         ensure!(

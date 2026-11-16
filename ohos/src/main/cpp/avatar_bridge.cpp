@@ -270,12 +270,30 @@ napi_value command(napi_env env, napi_callback_info info) {
     else if (method == "pause") { paused = value == "true"; changed.notify_all(); }
     else if (method == "voiceLevel") check(mesh_avatar_set_voice_level(avatar, std::stod(value)));
     else if (method == "speaking" || method == "mouthDemo") {
+      if (value == "true") check(mesh_avatar_stop_lip_sync(avatar));
       mouthDemo = method == "mouthDemo" && value == "true";
       speaking = value == "true"; check(mesh_avatar_set_speaking(avatar, speaking));
       if (!speaking) check(mesh_avatar_set_voice_level(avatar, 0));
     } else throw std::runtime_error("未知的原生操作");
   } catch (const std::exception& exception) { napi_throw_error(env, nullptr, exception.what()); return nullptr; }
   return undefined(env);
+}
+// 与渲染帧共用互斥锁，查询和操作不会访问已释放的角色。
+napi_value control(napi_env env, napi_callback_info info) {
+  size_t count = 1; napi_value args[1]; napi_get_cb_info(env, info, &count, args, nullptr, nullptr);
+  try {
+    if (count != 1) throw std::runtime_error("缺少控制请求");
+    auto request = stringValue(env, args[0]);
+    std::lock_guard<std::mutex> lock(mutex);
+    if (!avatar || stopped) throw std::runtime_error("角色尚未加载");
+    char* output = nullptr;
+    check(mesh_avatar_control_json(avatar, request.c_str(), &output));
+    napi_value result;
+    auto status = napi_create_string_utf8(env, output, NAPI_AUTO_LENGTH, &result);
+    mesh_avatar_free_string(output);
+    if (status != napi_ok) throw std::runtime_error("无法返回控制结果");
+    return result;
+  } catch (const std::exception& exception) { napi_throw_error(env, nullptr, exception.what()); return nullptr; }
 }
 napi_value stats(napi_env env, napi_callback_info) {
   std::lock_guard<std::mutex> lock(mutex);
@@ -290,11 +308,12 @@ napi_value stats(napi_env env, napi_callback_info) {
 }
 napi_value init(napi_env env, napi_value exports) {
   napi_property_descriptor props[] = {
+    {"control", nullptr, control, nullptr, nullptr, nullptr, napi_default, nullptr},
     {"load", nullptr, load, nullptr, nullptr, nullptr, napi_default, nullptr},
     {"dispose", nullptr, release, nullptr, nullptr, nullptr, napi_default, nullptr},
     {"command", nullptr, command, nullptr, nullptr, nullptr, napi_default, nullptr},
     {"stats", nullptr, stats, nullptr, nullptr, nullptr, napi_default, nullptr}};
-  napi_define_properties(env, exports, 4, props); return exports;
+  napi_define_properties(env, exports, 5, props); return exports;
 }
 napi_module module = {1, 0, nullptr, init, "avatar_bridge", nullptr, {0}};
 }
