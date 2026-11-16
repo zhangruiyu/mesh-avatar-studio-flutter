@@ -10,4 +10,4 @@
 - Rust 标准库许可与版权汇总保存在 `third_party/licenses/rust-standard-library`。
 - 预编译 Rust 库由 Rust 1.100.0 构建。Flutter、Apple SDK、Android SDK/NDK 和 HarmonyOS SDK 为宿主构建工具或系统依赖，不作为 SDK 全包再分发。
 
-双重或多重许可按原项目提供的可选许可使用；没有将其他项目统一改成 MIT。角色模型、用户图片和调试签名不在此发布包中。
+双重或多重许可按原项目提供的可选许可使用；没有将其他项目统一改成 MIT。官方 Miko 模型仅作为 `example` App 的组成部分分发，不适用 MIT；其独立使用条款与版权说明见 `example/assets/miko/MIKO_ASSET_TERMS.md` 和 https://miko.aituberonair.com/#terms 。用户自行制作的角色图片及调试签名不在此发布包中。

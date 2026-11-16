@@ -4,7 +4,7 @@ Flutter 原生 2D 网格角色播放器，Dart 包名为 `mesh_avatar_studio`。
 
 这是基于上游开源运行库开发的独立 Flutter 插件，并非上游官方插件。它读取 Mesh Avatar Studio 的 `.mavatar` ZIP 或导出目录，**不能直接读取 Live2D Cubism 的 `.moc3` / `.model3.json`**。
 
-当前为 `0.1.0-dev.1` 预览版。插件没有角色图片或模型，也不会自动下载模型、播放声音或申请录音权限。
+当前为 `0.1.0-dev.1` 预览版。插件不会自动下载模型、播放声音或申请录音权限。`example` 已内置官方 Miko 示例角色，运行即可体验；普通应用依赖插件不会自动打包该示例资源。
 
 ## 安装
 
@@ -132,17 +132,19 @@ debugPrint('${stats.frames} 帧，平均 ${stats.renderMilliseconds} ms');
 
 ## 示例与验证
 
-`example` 是只依赖插件公开接口的完整 Flutter 工程。它不内置任何角色；启动后输入应用可读取的模型路径，或启动时指定：
+`example` 是只依赖插件公开接口的完整 Flutter 工程，默认通过 `loadAsset` 加载随包的官方旗袍角色 Miko，无需网络或手动导入。可输入本地路径切换自定义角色，清空路径后点击“加载角色”回到 Miko。
+
+在 `example` 目录运行：
 
 ```sh
+flutter run -d 设备标识
+flutter test integration_test/native_avatar_test.dart -d 设备标识
+# 可选：改用自己的本地模型
 flutter run -d macos --dart-define=AVATAR_PATH=/绝对路径/角色.mavatar
-flutter test
-flutter analyze
-flutter test integration_test/native_avatar_test.dart -d 设备标识 --dart-define=AVATAR_PATH=设备中的模型路径
 ```
 
-最后一条在 `example` 中运行。移动设备路径是设备沙箱路径，不是电脑路径；先通过宿主自己的下载/导入流程写入。鸿蒙示例需要在 DevEco Studio 里为自己的设备生成调试签名，发布包不含证书。
+自定义模型的移动设备路径是设备沙箱路径，不是电脑路径；先通过宿主自己的下载/导入流程写入。鸿蒙示例需要在 DevEco Studio 里为自己的设备生成调试签名，发布包不含证书。
 
 ## 原生源码、许可与维护
 
-上游固定版本、构建方式和二进制校验见 [native/README.md](native/README.md) 与 [native/BINARIES.json](native/BINARIES.json)。插件和上游运行库为 MIT；依赖的许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。预编译库只包含运行时，不包含角色素材。
+上游固定版本、构建方式和二进制校验见 [native/README.md](native/README.md) 与 [native/BINARIES.json](native/BINARIES.json)。插件代码和上游运行库为 MIT；**Miko 角色素材不属于 MIT**，需遵守[官方角色条款](https://miko.aituberonair.com/#terms)，原始说明保存在 `example/assets/miko`；依赖的许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。预编译库只包含运行时，不包含角色素材。

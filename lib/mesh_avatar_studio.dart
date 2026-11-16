@@ -120,7 +120,7 @@ class MeshAvatarController extends ChangeNotifier with WidgetsBindingObserver {
     return _load({'path': '', 'bytes': Uint8List.fromList(bytes)});
   }
 
-  /// 从宿主 App 自己声明的 asset 加载；插件不携带任何角色图片或模型。
+  /// 从宿主 App 自己声明的 asset 加载；插件不自动指定角色，官方 Miko 资源仅由 example 声明。
   Future<void> loadAsset(String key, {AssetBundle? bundle}) {
     _checkOpen();
     if (key.trim().isEmpty) throw ArgumentError('资源名称不能为空');

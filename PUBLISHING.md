@@ -14,7 +14,7 @@ python3 tool/check_binaries.py
 dart pub publish --dry-run
 ```
 
-确认 `example` 在目标平台构建并执行真实模型集成测试，核对 `README.md` 的平台限制和 `CHANGELOG.md`。修改 Rust 依赖后必须同时更新许可清单。示例的角色路径通过运行参数传入，模型文件、用户图片、密钥和调试签名均不得提交或发布。
+确认 `example` 在目标平台构建并执行真实模型集成测试，核对 `README.md` 的平台限制和 `CHANGELOG.md`。修改 Rust 依赖后必须同时更新许可清单。示例仅允许提交已确认随包的官方 Miko 模型及原始条款；其他模型、用户图片、密钥和调试签名不得提交或发布。核对官方模型仍被 `example/pubspec.yaml` 声明，且不会被 `.pubignore` 排除。
 
 预检只检查，不会上传。实际发布由包维护者在确认账号、版本和内容后执行 `dart pub publish`；发布后的版本不能覆盖。
 

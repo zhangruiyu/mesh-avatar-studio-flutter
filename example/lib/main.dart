@@ -11,7 +11,7 @@ void main() => runApp(
       ),
     );
 
-// 示例只演示公开接口。角色来自宿主指定路径，不把用户素材放进发布包。
+// 官方 Miko 仅作为示例 App 的本地资源，业务应用依赖插件时不会自动打包它。
 class AvatarExample extends StatefulWidget {
   const AvatarExample({super.key});
   @override
@@ -24,7 +24,7 @@ class _AvatarExampleState extends State<AvatarExample> {
     text: const String.fromEnvironment('AVATAR_PATH'),
   );
   bool mouthDemo = false;
-  String status = '输入设备上的 .mavatar 路径，或用 AVATAR_PATH 指定。';
+  String status = '正在加载官方 Miko 示例…';
   Timer? timer;
   int previousFrames = 0;
 
@@ -32,7 +32,7 @@ class _AvatarExampleState extends State<AvatarExample> {
   void initState() {
     super.initState();
     controller.addListener(refresh);
-    if (path.text.isNotEmpty) unawaited(load());
+    unawaited(load());
     timer = Timer.periodic(const Duration(seconds: 1), (_) async {
       if (!controller.isLoaded || controller.isLoading) return;
       try {
@@ -63,7 +63,12 @@ class _AvatarExampleState extends State<AvatarExample> {
   }
 
   Future<void> load() => run(() async {
-        await controller.loadFile(path.text);
+        final selectedPath = path.text.trim();
+        if (selectedPath.isEmpty) {
+          await controller.loadAsset('assets/miko/miko-qipao.mavatar');
+        } else {
+          await controller.loadFile(selectedPath);
+        }
         mouthDemo = false;
         previousFrames = 0;
       });
@@ -98,14 +103,17 @@ class _AvatarExampleState extends State<AvatarExample> {
                 ),
                 TextField(
                   controller: path,
-                  decoration: const InputDecoration(labelText: '本地模型路径'),
+                  decoration: const InputDecoration(
+                    labelText: '自定义模型路径（可选）',
+                    hintText: '留空使用官方 Miko 示例',
+                  ),
                 ),
                 Wrap(
                   spacing: 8,
                   children: [
                     FilledButton(
                       onPressed: controller.isLoading ? null : load,
-                      child: const Text('加载模型'),
+                      child: const Text('加载角色'),
                     ),
                     for (final item in [
                       (MeshAvatarExpression.neutral, '自然'),
@@ -155,6 +163,8 @@ class _AvatarExampleState extends State<AvatarExample> {
                   ],
                 ),
                 Text(status),
+                const Text('Miko © Yuki Shindo (AITuber OnAir)',
+                    style: TextStyle(fontSize: 11)),
                 const Text('无声音演示 · 不使用 WebView',
                     style: TextStyle(fontSize: 12)),
               ],

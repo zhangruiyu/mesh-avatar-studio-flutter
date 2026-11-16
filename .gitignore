@@ -78,3 +78,6 @@ migrate_working_dir/
 **/libs/**/libflutter.so
 **/libs/**/libapp.so
 **/libs/**/libvmservice_snapshot.so
+
+# 仅公开示例使用的官方 Miko 模型允许随包。
+!example/assets/miko/miko-qipao.mavatar

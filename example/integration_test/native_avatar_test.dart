@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:mesh_avatar_studio/mesh_avatar_studio.dart';
@@ -8,16 +9,24 @@ void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   testWidgets('插件注册、文件和字节加载、动作控制与释放恢复', (tester) async {
     const path = String.fromEnvironment('AVATAR_PATH');
-    expect(path, isNotEmpty, reason: '用 AVATAR_PATH 指定测试模型，模型不随插件发布');
-    final deadline = DateTime.now().add(const Duration(seconds: 45));
-    while (!File(path).existsSync() && DateTime.now().isBefore(deadline)) {
-      await tester.pump(const Duration(milliseconds: 100));
+    // 默认验证官方随包模型；仍可通过参数验证宿主自己的文件。
+    const assetKey = 'assets/miko/miko-qipao.mavatar';
+    final asset = await rootBundle.load(assetKey);
+    final assetBytes =
+        asset.buffer.asUint8List(asset.offsetInBytes, asset.lengthInBytes);
+    Directory? temp;
+    var modelPath = path;
+    if (path.isEmpty) {
+      temp = await Directory.systemTemp.createTemp('mesh-avatar-test-');
+      modelPath = '${temp.path}/miko-qipao.mavatar';
+      await File(modelPath).writeAsBytes(assetBytes, flush: true);
     }
-    final bytes = File(path).readAsBytesSync();
+    final bytes = File(modelPath).readAsBytesSync();
     final controller = MeshAvatarController();
     addTearDown(() async {
       await controller.close();
       controller.dispose();
+      if (temp != null) await temp.delete(recursive: true);
     });
     await tester.pumpWidget(MaterialApp(
         home: Scaffold(body: MeshAvatarView(controller: controller))));
@@ -32,7 +41,9 @@ void main() {
       fail('原生纹理没有继续提交帧');
     }
 
-    await controller.loadFile(path);
+    await controller.loadAsset(assetKey);
+    await framesAdvance();
+    await controller.loadFile(modelPath);
     await framesAdvance();
     expect(find.byType(Texture), findsOneWidget);
     for (final expression in MeshAvatarExpression.values) {
@@ -71,6 +82,6 @@ void main() {
     await controller.close();
     expect((await controller.getStats()).loaded, false);
     expect(tester.takeException(), isNull);
-    debugPrint('插件真实原生集成测试通过：自动注册、8 种表情、音量口型、3 次字节重载、暂停、失败恢复和释放。');
+    debugPrint('插件真实原生集成测试通过：官方 asset 加载、自动注册、8 种表情、音量口型、3 次字节重载、暂停、失败恢复和释放。');
   });
 }
