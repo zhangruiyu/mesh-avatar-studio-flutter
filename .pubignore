@@ -42,3 +42,6 @@
 **/libs/**/libflutter.so
 **/libs/**/libapp.so
 **/libs/**/libvmservice_snapshot.so
+
+**/__pycache__/
+**/*.pyc
